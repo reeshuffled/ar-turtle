@@ -5,28 +5,37 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <link rel="stylesheet" href="lib/codemirror.css">
+    <link rel="stylesheet" href="addon/hint/show-hint.css">
     <style>
         /* Extra CodeMirror CSS */
-        .CodeMirror{border-top:1px solid #888;border-bottom:1px solid #888; height: 100%;}ul{padding-left:0}ul li{display:inline;border:1px solid #000;padding:5px;border-radius:10px}li.active{color:#fff;background-color:#3954AE}
+        .CodeMirror{border-top:1px solid #888;border-bottom:1px solid #888; height: 100%;}
+        nav ul{padding-left:0}nav ul li{display:inline;border:1px solid #000;padding:5px;border-radius:10px}nav li.active{color:#fff;background-color:#3954AE}
+
+        #fsContainer { display: contents; }
+        #fsContainer:fullscreen {
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #fsContainer:fullscreen #canvasWrapper {
+            width: 100vmin !important;
+            height: 100vmin !important;
+        }
+
+        #canvasWrapper {
+            position: relative;
+        }
 
         #camera, #turtle {
             position: absolute;
-            top: 7%;
-            right: 0;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
         }
 
         #turtle { z-index: 20; }
-        #turtleSprite {
-            background-image: url('turtle.png');
-            top:0;
-	        left:0;
-        	width:41px;
-        	height:41px;
-        	margin:-21px;
-            transform-origin: 50% 50%;
-            position: relative;
-            z-index: 31;
-        }
 
         /* Split Panel CSS */
         .panel-container { height: 91vh; }
@@ -60,17 +69,24 @@
 <body>
     <!-- HTML Code Container (Holds written code, this is not the preview) -->
     <div id="code_text" style="display:none">
-var turtle = new Turtle(c);
+const turtle = new Turtle();
 </div>
     <!-- Menu -->
+    <nav>
     <ul style="font-family: Arial, sans-serif">
         <!--<li>Block</li>-->
         <!--<li>Drag-to-Text</li>-->
         <li class="active">Text</li>
-        <li id="execute" style="float:right; margin-right: 10px; background-color: green; color: white">
+        <li id="cameraWrapper" style="display:none; border:none; padding:2px 8px">
+            Camera: <select id="cameraSelect"></select>
+        </li>
+        <li id="cameraToggle" style="display:none">Turn Camera On</li>
+        <li id="fullscreenBtn" style="float:right; margin-right: 4px">Fullscreen</li>
+        <li id="execute" style="float:right; margin-right: 4px; background-color: green; color: white">
             Execute Program
         </li>
     </ul>
+    </nav>
     
     <div class="panel-container">
         <div class="panel-container">
@@ -82,9 +98,12 @@ var turtle = new Turtle(c);
 
             <div class="panel-right">
                 <!-- Camera and Drawing Canvases -->
-                <canvas id="camera" height="600" width="600"></canvas>
-                <canvas id="turtle" height="600" width="600"></canvas>
-                <span id="turtleSprite"></span>
+                <div id="fsContainer">
+                    <div id="canvasWrapper">
+                        <canvas id="camera" height="600" width="600"></canvas>
+                        <canvas id="turtle" height="600" width="600"></canvas>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -95,15 +114,14 @@ var turtle = new Turtle(c);
     <script src="js/jshint.js"></script>
     <script src="addon/lint/javascript-lint.js"></script>
     <script src="mode/javascript/javascript.js"></script>
+    <script src="addon/hint/show-hint.js"></script>
+    <script src="addon/hint/javascript-hint.js"></script>
     
     <!-- Splitter Panel JavaScript -->
     <script src="js/jquery.min.js"></script>
     <script src="js/jquery-resizable.min.js"></script>
     
-    <!-- JS Turtle JavaScript -->
-    <script src="js/turtle.js"></script>
-    
     <!-- App JavaScript -->
-    <script src="js/app.js"></script>
+    <script type="module" src="/js/app.js"></script>
 </body>
 </html>

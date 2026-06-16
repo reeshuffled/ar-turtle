@@ -1,423 +1,299 @@
 /*
-Copyright (c) 2012 Greg Reimer
-http://obadger.com/
-"gregreimer" "at" "gmail" "dot" "com"
+Copyright (c) 2012 Greg Reimer — http://obadger.com/
+MIT License — see full text in the original source.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
-of the Software, and to permit persons to whom the Software is furnished to do
-so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+Modernized to ES2022 by the ar-turtle project.
 */
 
-/* ########################################################################## */
+export class Turtle {
+  constructor(canvas = document.getElementById('turtle')) {
+    const ctx = canvas.getContext('2d');
+    const canvasWidth = canvas.width;
+    const canvasHeight = canvas.height;
+    ctx.lineCap = 'round';
 
-/*
-This library exposes window.Turte, which is a constructor for a turtle graphics
-environment. Pass a canvas element to the constructor, like so:
+    const DEFAULT_FG = '#000';
+    const DEFAULT_BG = '#fff';
+    const DEFAULT_WIDTH = '1';
+    const origin = {
+      x: Math.floor(canvasWidth / 2) + 0.5,
+      y: Math.floor(canvasHeight / 2) + 0.5,
+    };
 
-    var canvas = document.getElementById('mycanvas');
-    var t = new Turtle(canvas);
+    let foreground = DEFAULT_FG;
+    let background = DEFAULT_BG;
+    let width = DEFAULT_WIDTH;
+    let penDown = true;
+    let pos = {};
+    let heading = 0;
+    let stopped = false;
+    const events = {};
 
-...then call methods on the "t" variable, like so:
+    // ── Event system ─────────────────────────────────────────────────────────
+    const trigger = (ev, ...args) => {
+      events[ev]?.forEach(h => h.apply(this, args));
+    };
 
-    t.fd(100).lt(90); // forward 100px, left turn 90deg
+    this.on = (ev, handler) => {
+      if (!events[ev]) events[ev] = [];
+      events[ev].push(handler);
+      return this;
+    };
 
-...and a drawing will subsequently be drawn onto the canvas.
-*/
+    // ── Queue ────────────────────────────────────────────────────────────────
+    // Processes one action per tick (or batches when the queue is very long).
+    // The idle poll (200 ms) keeps the loop alive between bursts.
+    const q = (() => {
+      const funs = [];
+      let at = 0;
+      const run = () => {
+        if (stopped) return;
+        const len = funs.length - at;
+        if (len > 0) {
+          if (len > 500) {
+            for (let i = 0; i < len / 250; i++) funs[at++]();
+          } else {
+            funs[at++]();
+          }
+          setTimeout(run, 0);
+        } else {
+          if (funs.length > 0) { funs.length = 0; at = 0; }
+          setTimeout(run, 200);
+        }
+      };
+      run();
+      return (fn) => funs.push(fn);
+    })();
 
-window.Turtle = function(canvas){
+    // ── Low-level draw ───────────────────────────────────────────────────────
+    // Caches strokeStyle/lineWidth to skip redundant ctx assignments.
+    const go = (() => {
+      let oldX, oldY, oldFg, oldWidth;
+      return (args) => {
+        ctx.beginPath();
+        if (args.fg !== oldFg) { ctx.strokeStyle = args.fg; oldFg = args.fg; }
+        if (args.width !== oldWidth) { ctx.lineWidth = args.width; oldWidth = args.width; }
+        ctx.moveTo(oldX, oldY);
+        ctx.lineTo(args.x, args.y);
+        if (args.pd) ctx.stroke();
+        oldX = args.x;
+        oldY = args.y;
+        trigger('move', args);
+      };
+    })();
 
-	var slice = [].slice;
+    const moveTo = (x, y) => {
+      pos.x = x;
+      pos.y = y;
+      const args = { x, y, pd: penDown, width, fg: foreground };
+      q(() => go(args));
+    };
 
-	var ctx = canvas.getContext("2d");
-	var canvasWidth = canvas.width;
-	var canvasHeight = canvas.height;
-	ctx.lineCap = 'round';
+    // ── Movement ─────────────────────────────────────────────────────────────
+    this.forward = (amount) => {
+      pos.x += Math.sin(heading) * -amount;
+      pos.y += Math.cos(heading) * -amount;
+      const args = { x: pos.x, y: pos.y, pd: penDown, width, fg: foreground };
+      q(() => go(args));
+      return this;
+    };
+    this.backward = (amount) => this.forward(-amount);
 
-	var T = this;
+    this.xy = (x, y) => { moveTo(origin.x + x, origin.y - y); return this; };
+    this.x  = (x)    => { moveTo(origin.x + x, pos.y);        return this; };
+    this.y  = (y)    => { moveTo(pos.x, origin.y - y);        return this; };
 
-	// bits of unchanging info
-	var defaultFg = '#fff';
-	var defaultBg = '#222';
-	var defaultWidth = '1';
-	var origin = {
-		x: Math.floor(canvasWidth / 2) + .5,
-		y: Math.floor(canvasHeight / 2) + .5
-	};
+    this.heading = (deg) => {
+      heading = -deg * (Math.PI / 180);
+      const absDeg = this.get.heading();
+      q(() => trigger('rotate', absDeg));
+      return this;
+    };
 
-	// bits of info that change
-	var foreground = defaultFg;
-	var background = defaultBg;
-	var width = width;
-	var penDown = true;
-	var pos = {};
-	var heading = 0;
+    this.face = (x, y) => {
+      const absX = origin.x + x;
+      const absY = origin.y - y;
+      heading = Math.atan2(pos.x - absX, pos.y - absY);
+      q(() => trigger('rotate', heading * (180 / Math.PI)));
+      return this;
+    };
 
-	// general purpose line drawing method, no rotation
-	var go = (function(){
-		var oldX = undefined;
-		var oldY = undefined;
-		var oldFg = undefined;
-		var oldWidth = undefined;
-		return function(args){
-			ctx.beginPath();
-			if (args.fg !== oldFg) {
-				ctx.strokeStyle = args.fg;
-				oldFg = args.fg;
-			}
-			if (args.width !== oldWidth) {
-				ctx.lineWidth = args.width;
-				oldWidth = args.width;
-			}
-			ctx.moveTo(oldX, oldY);
-			ctx.lineTo(args.x, args.y);
-			if (args.pd) {
-				ctx.stroke();
-			}
-			oldX = args.x;
-			oldY = args.y;
-			trigger('move', args);
-		};
-	})();
+    this.butt = (x, y) => {
+      const absX = origin.x + x;
+      const absY = origin.y - y;
+      heading = Math.atan2(pos.x - absX, pos.y - absY) + Math.PI;
+      q(() => trigger('rotate', heading * (180 / Math.PI)));
+      return this;
+    };
 
-	// queueing function
-	var q = (function(){	
-		var funs = [];
-		var at = 0;
-		(function run(){
-			var len = funs.length - at;
-			if (len > 0) {
-				if (len > 500) {
-					// for really long runs, batch actions together
-					for (var i=0; i<len/250; i++) {
-						funs[at++]();
-					}
-				} else {
-					// otherwise one action at a time
-					funs[at++]();
-				}
-				setTimeout(run,0);
-			} else {
-				if (funs.length > 0){
-					funs = [];
-					at = 0;
-				}
-				setTimeout(run, 200);
-			}
-		})();
-		return function(fun){
-			funs.push(fun);
-		}
-	})();
+    // ── Shapes ───────────────────────────────────────────────────────────────
+    this.disc = (radius) => {
+      const { x, y } = pos;
+      q(() => {
+        ctx.beginPath();
+        ctx.fillStyle = foreground;
+        ctx.arc(x, y, radius, 0, 2 * Math.PI, true);
+        ctx.fill();
+      });
+      return this;
+    };
 
-	// ######################################################
-	// event handlers
-	var events = {};
-	T.on = function(ev, handler){
-		var handlers = events[ev];
-		if (!handlers) { handlers = events[ev] = []; }
-		handlers.push(handler);
-	};
-	function trigger(ev){
-		var args = slice.call(arguments);
-		args.shift();
-		var handlers = events[ev];
-		if (handlers) {
-			for (var i=0; i<handlers.length; i++) {
-				handlers[i].apply(T, args);
-			}
-		}
-	}
+    this.circle = (radius) => {
+      const { x, y } = pos;
+      q(() => {
+        ctx.beginPath();
+        ctx.strokeStyle = foreground;
+        ctx.arc(x, y, radius, 0, 2 * Math.PI, true);
+        ctx.stroke();
+      });
+      return this;
+    };
 
-	// ######################################################
-	// move forward, back
-	T.forward = function(amount) {
-		pos.x += Math.sin(heading) * -amount;
-		pos.y += Math.cos(heading) * -amount;
-		var args = {
-			x:pos.x,
-			y:pos.y,
-			pd:penDown,
-			width:width,
-			fg:foreground
-		};
-		q(function(){ go(args); });
-		return T;
-	};
-	T.backward = function(amount) {
-		return T.forward(-amount);
-	};
+    // ── Rotation ─────────────────────────────────────────────────────────────
+    this.right = (deg) => {
+      heading -= deg * (Math.PI / 180);
+      const absDeg = this.get.heading();
+      q(() => trigger('rotate', absDeg));
+      return this;
+    };
+    this.left = (deg) => this.right(-deg);
 
-	// ######################################################
-	// move to absolute positions
-	function xy(x,y){
-		pos.x = x;
-		pos.y = y;
-		var args = {
-			x:pos.x,
-			y:pos.y,
-			pd:penDown,
-			width:width,
-			fg:foreground
-		};
-		q(function(){ go(args); });
-	}
-	T.xy = function(x, y){
-		xy(origin.x+x, origin.y-y);
-		return T;
-	};
-	T.x = function(x){
-		xy(origin.x+x, pos.y);
-		return T;
-	};
-	T.y = function(y){
-		xy(pos.x, origin.y-y);
-		return T;
-	};
-	T.heading = function(deg){
-		heading = -deg * (Math.PI/180);
-		var absDeg = T.get.heading();
-		q(function(){
-			trigger('rotate', absDeg);
-		});
-		return T;
-	};
-	T.face = function(x, y){
-		y = -y;
-		y += origin.y;
-		x += origin.x;
-		heading = Math.atan2(pos.x - x, pos.y - y);
-		var absDeg = heading * (180/Math.PI);
-		q(function(){
-			trigger('rotate', absDeg);
-		});
-		return T;
-	};
-	T.butt = function(x, y){
-		y = -y;
-		y += origin.y;
-		x += origin.x;
-		heading = Math.atan2(pos.x - x, pos.y - y) + Math.PI;
-		var absDeg = heading * (180/Math.PI);
-		q(function(){
-			trigger('rotate', absDeg);
-		});
-		return T;
-	};
+    // ── Pen ──────────────────────────────────────────────────────────────────
+    this.pu = () => { penDown = false; q(() => trigger('pu')); return this; };
+    this.pd = () => { penDown = true;  q(() => trigger('pd')); return this; };
 
-	// ######################################################
-	// circular things
-	T.disc = function(radius){
-		var x = pos.x;
-		var y = pos.y;
-		q(function(){
-			ctx.beginPath();
-			ctx.fillStyle = foreground;
-			ctx.arc(x, y, radius, 0, 2*Math.PI, true);
-			ctx.fill();
-		});
-		return T;
-	};
-	T.circle = function(radius){
-		var x = pos.x;
-		var y = pos.y;
-		q(function(){
-			ctx.beginPath();
-			ctx.strokeStyle = foreground;
-			ctx.arc(x, y, radius, 0, 2*Math.PI, true);
-			ctx.stroke();
-		});
-		return T;
-	};
+    // ── Style ────────────────────────────────────────────────────────────────
+    this.color     = (c) => { foreground = c; return this; };
+    this.thickness = (w) => { width = w;      return this; };
 
-	// ######################################################
-	// left turn, right turn
-	T.right = function(deg) {
-		var delta = deg * (Math.PI/180);
-		heading -= delta;
-		var absDeg = T.get.heading();
-		q(function(){
-			trigger('rotate', absDeg);
-		});
-		return T;
-	};
-	T.left = function(deg) {
-		return T.right(-deg);
-	};
+    this.clean = (color) => {
+      if (color) background = color;
+      const bg = background;
+      q(() => {
+        ctx.fillStyle = bg;
+        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+      });
+      return this;
+    };
 
-	// ######################################################
-	// pen up, pen down
-	T.pu = function() {
-		penDown = false;
-		q(function(){ trigger('pu'); });
-		return T;
-	};
-	T.pd = function() {
-		penDown = true;
-		q(function(){ trigger('pd'); });
-		return T;
-	};
+    this.home = () => {
+      heading = 0;
+      pos.x = origin.x;
+      pos.y = origin.y;
+      const args = { x: pos.x, y: pos.y, pd: false, width, fg: foreground };
+      q(() => { go(args); trigger('rotate', 0); });
+      return this;
+    };
 
-	// ######################################################
-	// misc
-	T.color = function(color) {
-		foreground = color;
-		return T;
-	};
-	T.thickness = function(aWidth){
-		width = aWidth;
-		return T;
-	};
-	T.clean = function(color){
-		if (color) background = color;
-		var bg = background;
-		q(function(){
-			ctx.fillStyle = bg;
-			ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-			ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-		});
-		return T;
-	};
-	T.home = function(){
-		heading = 0;
-		pos.x = origin.x;
-		pos.y = origin.y;
-		var args = {
-			x:pos.x,
-			y:pos.y,
-			pd:false,
-			width:width,
-			fg:foreground
-		};
-		q(function(){
-			go(args);
-			trigger('rotate', 0);
-		});
-		return T;
-	};
-	T.clear = function(){
-		return T
-		.clean()
-		.home()
-		.pd();
-	};
-	T.reset = T.init = function(){
-		background = 'transparent';
-		return T
-		.color(defaultFg)
-		.thickness(defaultWidth)
-		.clear();
-	};
+    this.clear = () => this.clean().home().pd();
 
-	// ######################################################
-	// loopers
-	T.repeat = function(amount, fun){
-		for (var i=0; i<amount; i++) {
-			var result = fun.call(T, i);
-			if (!result && result !== undefined) break;
-		}
-		return T;
-	};
-	T.forever = function(fun){
-		var i = 0;
-		while (true) {
-			var result = fun.call(T, i);
-			if (!result && result !== undefined) break;
-			i++;
-		}
-		return T;
-	};
+    this.reset = this.init = () => {
+      background = 'transparent';
+      return this.color(DEFAULT_FG).thickness(DEFAULT_WIDTH).clear();
+    };
 
-	// ######################################################
-	// misc getters
-	T.get = {
-		x: function(){
-			return pos.x - origin.x;
-		},
-		y: function(){
-			return origin.y - pos.y;
-		},
-		heading: function(){
-			return -heading * (180/Math.PI);
-		},
-		pu: function(){
-			return !penDown;
-		},
-		pd: function(){
-			return penDown;
-		},
-		thickness: function(){
-			return width;
-		},
-		color: function(){
-			return foreground;
-		},
-		background: function(){
-			return background;
-		},
-		oob: function(){
-			return pos.x > canvasWidth
-				|| pos.y > canvasHeight
-				|| pos.x < 0
-				|| pos.y < 0;
-		},
-		top: function(){ return origin.y; },
-		left: function(){ return -origin.x; },
-		right: function(){ return origin.x; },
-		bottom: function(){ return -origin.y; }
-	};
+    // ── Sprite ───────────────────────────────────────────────────────────────
+    const sprite = document.createElement('span');
+    Object.assign(sprite.style, {
+      backgroundImage: "url('turtle.png')",
+      width: '41px', height: '41px', margin: '-21px',
+      transformOrigin: '50% 50%',
+      position: 'absolute', zIndex: '31',
+    });
+    canvas.parentElement?.appendChild(sprite);
 
-	var normal = (function(){
-		var _u, _v;
-		function generate() {
-			while (true) {
-				var u = (2 * Math.random()) - 1;
-				var v = (2 * Math.random()) - 1;
-				var r = u*u + v*v;
-				/*if outside interval [0,1] start over*/
-				if(r === 0 || r >= 1) continue;
+    const scale = () => canvas.clientWidth / canvas.width;
+    this.on('move',   t   => {
+      const s = scale();
+      sprite.style.left = `${t.x * s}px`;
+      sprite.style.top  = `${t.y * s}px`;
+    });
+    this.on('rotate', deg => {
+      sprite.style.transform = `rotate(${Math.round(deg)}deg)`;
+    });
 
-				var c = Math.sqrt(-2 * Math.log(r) / r);
-				_u = u*c, _v = v*c;
-				return;
-			}
-		}
-		return function(){
-			var result;
-			if (_u === undefined && _v === undefined) generate();
-			if (_u !== undefined) result = _u, _u = undefined;
-			else                  result = _v, _v = undefined;
-			return result;
-		};
-	})();
+    const ro = new ResizeObserver(() => {
+      const s = scale();
+      sprite.style.left = `${pos.x * s}px`;
+      sprite.style.top  = `${pos.y * s}px`;
+    });
+    ro.observe(canvas.parentElement);
 
-	T.rand = {
-		uni:function(lower, upper){
-			if (upper === undefined) upper = lower, lower = 0;
-			var diff = upper - lower;
-			return Math.random() * diff + lower;
-		},
-		norm:function(mean, stdDev){
-			return mean + (normal() * stdDev);
-		},
-		chance:function(odds){
-			return Math.random() < odds;
-		}
-	};
+    (window.__ar_turtles ??= []).push(this);
 
-	// init this turtle
-	T.init();
-};
+    this.stop = () => { stopped = true; sprite.remove(); ro.disconnect(); };
+
+    // ── Loopers ──────────────────────────────────────────────────────────────
+    this.repeat = (amount, fn) => {
+      for (let i = 0; i < amount; i++) {
+        const result = fn.call(this, i);
+        if (!result && result !== undefined) break;
+      }
+      return this;
+    };
+
+    // NOTE: forever() is a synchronous infinite loop — it will freeze the
+    // browser unless fn returns false at some point to break out.
+    this.forever = (fn) => {
+      let i = 0;
+      while (true) {
+        const result = fn.call(this, i++);
+        if (!result && result !== undefined) break;
+      }
+      return this;
+    };
+
+    // ── Getters ──────────────────────────────────────────────────────────────
+    this.get = {
+      x:          () => pos.x - origin.x,
+      y:          () => origin.y - pos.y,
+      heading:    () => -heading * (180 / Math.PI),
+      pu:         () => !penDown,
+      pd:         () => penDown,
+      thickness:  () => width,
+      color:      () => foreground,
+      background: () => background,
+      oob: () =>
+        pos.x > canvasWidth || pos.y > canvasHeight || pos.x < 0 || pos.y < 0,
+      top:    () => origin.y,
+      left:   () => -origin.x,
+      right:  () => origin.x,
+      bottom: () => -origin.y,
+    };
+
+    // ── Random ───────────────────────────────────────────────────────────────
+    // Box-Muller transform for normal distribution.
+    const normal = (() => {
+      let _u, _v;
+      const generate = () => {
+        while (true) {
+          const u = Math.random() * 2 - 1;
+          const v = Math.random() * 2 - 1;
+          const r = u * u + v * v;
+          if (r === 0 || r >= 1) continue;
+          const c = Math.sqrt(-2 * Math.log(r) / r);
+          _u = u * c; _v = v * c;
+          return;
+        }
+      };
+      return () => {
+        if (_u === undefined && _v === undefined) generate();
+        if (_u !== undefined) { const r = _u; _u = undefined; return r; }
+        const r = _v; _v = undefined; return r;
+      };
+    })();
+
+    this.rand = {
+      uni:    (lower, upper) => {
+        if (upper === undefined) { [lower, upper] = [0, lower]; }
+        return Math.random() * (upper - lower) + lower;
+      },
+      norm:   (mean, stdDev) => mean + normal() * stdDev,
+      chance: (odds) => Math.random() < odds,
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────
+    this.init();
+  }
+}
