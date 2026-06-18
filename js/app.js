@@ -1,5 +1,8 @@
 import { Turtle } from './turtle.js';
 import esprima from 'esprima';
+import * as Blockly from 'blockly';
+import { javascriptGenerator, TOOLBOX } from './blocks.js';
+import { textToBlocks } from './text-to-blocks.js';
 
 // Capture native timer functions before any user-code patching.
 const _nativeSetInterval  = window.setInterval.bind(window);
@@ -394,9 +397,114 @@ window.onload = () => {
     }, 300);
   };
 
+  // ── Mode switching (Text ↔ Blocks) ───────────────────────────────────────
+  const modeSelect   = document.getElementById('modeSelect');
+  const editorEl     = document.getElementById('editor');
+  const blocklyArea  = document.getElementById('blockly-area');
+  const blocklyDiv   = document.getElementById('blockly-div');
+  const panelRight   = document.querySelector('.panel-right');
+  const splitterEl   = document.querySelector('.splitter');
+
+  const BLOCKS_STORAGE_KEY = 'ar-turtle-blocks';
+
+  let blocklyWorkspace = null;
+  let currentMode = 'text';
+  // Last code that was synced INTO the workspace — used to detect external edits.
+  let lastSyncedCode = null;
+
+  function initBlockly() {
+    if (blocklyWorkspace) return;
+    blocklyWorkspace = window.__ar_blocklyWorkspace = Blockly.inject(blocklyDiv, {
+      toolbox: TOOLBOX,
+      grid: { spacing: 20, length: 3, colour: '#ccc', snap: true },
+      zoom: { controls: true, wheel: true, startScale: 1.0 },
+      trashcan: true,
+      scrollbars: true,
+    });
+    // Restore saved workspace state
+    const saved = localStorage.getItem(BLOCKS_STORAGE_KEY);
+    if (saved) {
+      try {
+        Blockly.serialization.workspaces.load(JSON.parse(saved), blocklyWorkspace);
+      } catch (_) { /* ignore corrupt state */ }
+    }
+    blocklyWorkspace.addChangeListener(() => {
+      if (blocklyWorkspace.isDragging()) return;
+      localStorage.setItem(
+        BLOCKS_STORAGE_KEY,
+        JSON.stringify(Blockly.serialization.workspaces.save(blocklyWorkspace)),
+      );
+    });
+  }
+
+  function blocksToText() {
+    if (!blocklyWorkspace) return;
+    const body = javascriptGenerator.workspaceToCode(blocklyWorkspace).trim();
+    const generated = body
+      ? `const turtle = new Turtle();\n${body}`
+      : 'const turtle = new Turtle();\n';
+    editor.setValue(generated);
+  }
+
+  function switchToBlocks() {
+    initBlockly();
+    const code = editor.getValue();
+    // Only rebuild blocks from text if the code changed since we last synced.
+    // If unchanged, restore saved workspace state (preserves zoom/pan/positions).
+    if (code !== lastSyncedCode) {
+      textToBlocks(code, blocklyWorkspace);
+      lastSyncedCode = code;
+      localStorage.setItem(
+        BLOCKS_STORAGE_KEY,
+        JSON.stringify(Blockly.serialization.workspaces.save(blocklyWorkspace)),
+      );
+    } else {
+      const saved = localStorage.getItem(BLOCKS_STORAGE_KEY);
+      if (saved) {
+        try {
+          Blockly.serialization.workspaces.load(JSON.parse(saved), blocklyWorkspace);
+        } catch (_) {}
+      }
+    }
+    editorEl.style.display    = 'none';
+    blocklyArea.style.display = 'block';
+    setTimeout(() => Blockly.svgResize(blocklyWorkspace), 0);
+    currentMode = 'blocks';
+  }
+
+  function switchToText() {
+    blocksToText();
+    lastSyncedCode = editor.getValue();
+    editorEl.style.display    = '';
+    blocklyArea.style.display = 'none';
+    editor.refresh();
+    currentMode = 'text';
+  }
+
+  const executeInMode = () => {
+    if (currentMode === 'blocks') { blocksToText(); execute(); }
+    else execute();
+  };
+
+  // Single execute button listener (mode-aware)
   executeBtn.addEventListener('click', () => {
-    if (btnState === 'idle')         execute();
+    if (btnState === 'idle')         executeInMode();
     else if (btnState === 'running') stopRunning();
     else                             reset();
+  });
+
+  modeSelect.addEventListener('change', () => {
+    reset();
+    if (modeSelect.value === 'blocks') switchToBlocks();
+    else switchToText();
+  });
+
+  // Blockly must be notified of any left-panel size change (splitter drag or window resize)
+  new ResizeObserver(() => {
+    if (currentMode === 'blocks' && blocklyWorkspace) Blockly.svgResize(blocklyWorkspace);
+  }).observe(panelLeft);
+
+  window.addEventListener('resize', () => {
+    if (currentMode === 'blocks' && blocklyWorkspace) Blockly.svgResize(blocklyWorkspace);
   });
 };

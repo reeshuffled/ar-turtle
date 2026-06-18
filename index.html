@@ -11,6 +11,13 @@
         .CodeMirror{border-top:1px solid #888;border-bottom:1px solid #888; height: 100%;}
         nav ul{padding-left:0}nav ul li{display:inline;border:1px solid #000;padding:5px;border-radius:10px}nav li.active{color:#fff;background-color:#3954AE}
 
+        /* Mode select */
+        #modeSelect { font-family: Arial, sans-serif; font-size: 14px; border: 1px solid #000; border-radius: 8px; padding: 4px 8px; cursor: pointer; background: #fff; }
+
+        /* Blockly container — fills left panel exactly like CodeMirror does */
+        #blockly-area { width: 100%; height: 100%; display: none; position: relative; }
+        #blockly-div  { position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
+
         #fsContainer {
             flex: 1 1 auto;
             min-height: 0;
@@ -110,9 +117,7 @@ const turtle = new Turtle();
     <!-- Menu -->
     <nav>
     <ul style="font-family: Arial, sans-serif">
-        <!--<li>Block</li>-->
-        <!--<li>Drag-to-Text</li>-->
-        <li class="active">Text</li>
+        <li style="border:none;padding:0"><select id="modeSelect"><option value="text">Text</option><option value="blocks">Blocks</option></select></li>
         <li id="cameraWrapper" style="display:none; border:none; padding:2px 8px">
             Camera: <select id="cameraSelect"></select>
         </li>
@@ -128,6 +133,9 @@ const turtle = new Turtle();
         <div class="panel-container">
             <div class="panel-left" style="width: 50%">
                 <div id="editor"></div>
+                <div id="blockly-area">
+                    <div id="blockly-div"></div>
+                </div>
             </div>
 
             <div class="splitter"></div>
