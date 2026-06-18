@@ -1,82 +1,89 @@
-import { Turtle } from './turtle.js';
-import esprima from 'esprima';
-import * as Blockly from 'blockly';
-import { javascriptGenerator, TOOLBOX } from './blocks.js';
-import { textToBlocks } from './text-to-blocks.js';
+import { Turtle } from "./turtle.js";
+import esprima from "esprima";
+import * as Blockly from "blockly";
+import { javascriptGenerator, TOOLBOX } from "./blocks.js";
+import { textToBlocks } from "./text-to-blocks.js";
 
 // Capture native timer functions before any user-code patching.
-const _nativeSetInterval  = window.setInterval.bind(window);
+const _nativeSetInterval = window.setInterval.bind(window);
 const _nativeClearInterval = window.clearInterval.bind(window);
 
 // Expose Turtle on window so user code in the editor can call `new Turtle(c)`.
 window.Turtle = Turtle;
 
 const TURTLE_COMPLETIONS = [
-  { text: 'forward',   displayText: 'forward(amount) — move forward by amount pixels' },
-  { text: 'backward',  displayText: 'backward(amount) — move backward by amount pixels' },
-  { text: 'right',     displayText: 'right(deg) — turn right by degrees' },
-  { text: 'left',      displayText: 'left(deg) — turn left by degrees' },
-  { text: 'xy',        displayText: 'xy(x, y) — teleport to canvas coordinate' },
-  { text: 'x',         displayText: 'x(x) — move to x, keep y' },
-  { text: 'y',         displayText: 'y(y) — move to y, keep x' },
-  { text: 'heading',   displayText: 'heading(deg) — set absolute heading in degrees' },
-  { text: 'face',      displayText: 'face(x, y) — point toward canvas coordinate' },
-  { text: 'butt',      displayText: 'butt(x, y) — point away from canvas coordinate' },
-  { text: 'disc',      displayText: 'disc(radius) — draw filled circle at current position' },
-  { text: 'circle',    displayText: 'circle(radius) — draw circle outline at current position' },
-  { text: 'pu',        displayText: 'pu() — pen up: lift pen, stop drawing lines' },
-  { text: 'pd',        displayText: 'pd() — pen down: draw lines while moving' },
-  { text: 'color',     displayText: 'color(c) — set pen color (any CSS color string)' },
-  { text: 'thickness', displayText: 'thickness(w) — set pen stroke width' },
-  { text: 'clean',     displayText: 'clean(color?) — fill background; optional color arg' },
-  { text: 'home',      displayText: 'home() — return to center and reset heading to 0°' },
-  { text: 'clear',     displayText: 'clear() — clean + home + pen down' },
-  { text: 'reset',     displayText: 'reset() — full reset: transparent bg, white pen, clear' },
-  { text: 'stop',      displayText: 'stop() — cancel all pending queued commands' },
-  { text: 'repeat',    displayText: 'repeat(n, fn) — call fn(i) n times; return false to break' },
-  { text: 'forever',   displayText: 'forever(fn) — loop fn(i) until fn returns false' },
-  { text: 'get',       displayText: 'get — getters: .x .y .heading .pu .pd .color .thickness .background .oob .top .left .right .bottom' },
-  { text: 'rand',      displayText: 'rand — randoms: .uni(lo,hi) .norm(mean,sd) .chance(odds)' },
-  { text: 'on',        displayText: 'on(event, fn) — listen to: "move", "rotate", "pu", "pd"' },
+  { text: "forward", displayText: "forward(amount) — move forward by amount pixels" },
+  { text: "backward", displayText: "backward(amount) — move backward by amount pixels" },
+  { text: "right", displayText: "right(deg) — turn right by degrees" },
+  { text: "left", displayText: "left(deg) — turn left by degrees" },
+  { text: "xy", displayText: "xy(x, y) — teleport to canvas coordinate" },
+  { text: "x", displayText: "x(x) — move to x, keep y" },
+  { text: "y", displayText: "y(y) — move to y, keep x" },
+  { text: "heading", displayText: "heading(deg) — set absolute heading in degrees" },
+  { text: "face", displayText: "face(x, y) — point toward canvas coordinate" },
+  { text: "butt", displayText: "butt(x, y) — point away from canvas coordinate" },
+  { text: "disc", displayText: "disc(radius) — draw filled circle at current position" },
+  { text: "circle", displayText: "circle(radius) — draw circle outline at current position" },
+  { text: "pu", displayText: "pu() — pen up: lift pen, stop drawing lines" },
+  { text: "pd", displayText: "pd() — pen down: draw lines while moving" },
+  { text: "color", displayText: "color(c) — set pen color (any CSS color string)" },
+  { text: "thickness", displayText: "thickness(w) — set pen stroke width" },
+  { text: "clean", displayText: "clean(color?) — fill background; optional color arg" },
+  { text: "home", displayText: "home() — return to center and reset heading to 0°" },
+  { text: "clear", displayText: "clear() — clean + home + pen down" },
+  { text: "reset", displayText: "reset() — full reset: transparent bg, white pen, clear" },
+  { text: "stop", displayText: "stop() — cancel all pending queued commands" },
+  { text: "repeat", displayText: "repeat(n, fn) — call fn(i) n times; return false to break" },
+  { text: "forever", displayText: "forever(fn) — loop fn(i) until fn returns false" },
+  {
+    text: "get",
+    displayText:
+      "get — getters: .x .y .heading .pu .pd .color .thickness .background .oob .top .left .right .bottom",
+  },
+  { text: "rand", displayText: "rand — randoms: .uni(lo,hi) .norm(mean,sd) .chance(odds)" },
+  { text: "on", displayText: 'on(event, fn) — listen to: "move", "rotate", "pu", "pd"' },
 ];
 
 // https://github.com/chinchang/web-maker/blob/master/src/utils.js
 function addInfiniteLoopProtection(code, timeout = 2000) {
   let loopId = 1;
   let patches = [];
-  const varPrefix = '_wmloopvar';
-  const varStr = 'var %d = Date.now();\n';
+  const varPrefix = "_wmloopvar";
+  const varStr = "var %d = Date.now();\n";
   const checkStr = `\nif (Date.now() - %d > ${timeout}) { window.stopRunning(); throw new Error("Infinite loop detected. Please make changes and press Execute Program when you are ready to try again."); break;}\n`;
 
   esprima.parseScript(code, { tolerant: true, range: true }, (node) => {
     switch (node.type) {
-      case 'DoWhileStatement':
-      case 'ForStatement':
-      case 'ForInStatement':
-      case 'ForOfStatement':
-      case 'WhileStatement': {
+      case "DoWhileStatement":
+      case "ForStatement":
+      case "ForInStatement":
+      case "ForOfStatement":
+      case "WhileStatement": {
         let start = 1 + node.body.range[0];
         let end = node.body.range[1];
-        let prolog = checkStr.replace('%d', varPrefix + loopId);
-        let epilog = '';
-        if (node.body.type !== 'BlockStatement') {
-          prolog = '{' + prolog;
-          epilog = '}';
+        let prolog = checkStr.replace("%d", varPrefix + loopId);
+        let epilog = "";
+        if (node.body.type !== "BlockStatement") {
+          prolog = "{" + prolog;
+          epilog = "}";
           --start;
         }
         patches.push({ pos: start, str: prolog });
-        patches.push({ pos: end,   str: epilog });
-        patches.push({ pos: node.range[0], str: varStr.replace('%d', varPrefix + loopId) });
+        patches.push({ pos: end, str: epilog });
+        patches.push({ pos: node.range[0], str: varStr.replace("%d", varPrefix + loopId) });
         ++loopId;
         break;
       }
-      default: break;
+      default:
+        break;
     }
   });
 
   patches
     .sort((a, b) => b.pos - a.pos)
-    .forEach(p => { code = code.slice(0, p.pos) + p.str + code.slice(p.pos); });
+    .forEach((p) => {
+      code = code.slice(0, p.pos) + p.str + code.slice(p.pos);
+    });
 
   return code;
 }
@@ -97,20 +104,26 @@ function turtleHint(cm, options) {
   if (/\b(?:string|comment)\b/.test(token.type)) return CodeMirror.hint.javascript(cm, options);
 
   if (!/^[\w$_]*$/.test(token.string)) {
-    token = { start: cur.ch, end: cur.ch, string: '', type: token.string === '.' ? 'property' : null, state: token.state };
+    token = {
+      start: cur.ch,
+      end: cur.ch,
+      string: "",
+      type: token.string === "." ? "property" : null,
+      state: token.state,
+    };
   } else if (token.end > cur.ch) {
     token.end = cur.ch;
     token.string = token.string.slice(0, cur.ch - token.start);
   }
 
-  if (token.type === 'property') {
+  if (token.type === "property") {
     const dotToken = cm.getTokenAt(Pos(cur.line, token.start));
-    if (dotToken.string === '.') {
+    if (dotToken.string === ".") {
       const objToken = cm.getTokenAt(Pos(cur.line, dotToken.start));
       if (getTurtleVarNames(cm).has(objToken.string)) {
         const prefix = token.string;
         return {
-          list: TURTLE_COMPLETIONS.filter(c => c.text.startsWith(prefix)),
+          list: TURTLE_COMPLETIONS.filter((c) => c.text.startsWith(prefix)),
           from: Pos(cur.line, token.start),
           to: Pos(cur.line, token.end),
         };
@@ -122,80 +135,83 @@ function turtleHint(cm, options) {
 }
 
 window.onload = () => {
-  const splitter = document.querySelector('.splitter');
-  const panelLeft = document.querySelector('.panel-left');
-  splitter.addEventListener('mousedown', (e) => {
-    const startX = e.clientX, startW = panelLeft.offsetWidth;
-    const onMove = (e) => panelLeft.style.width = `${startW + e.clientX - startX}px`;
-    const onUp   = () => { document.removeEventListener('mousemove', onMove);
-                           document.removeEventListener('mouseup', onUp); };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+  const splitter = document.querySelector(".splitter");
+  const panelLeft = document.querySelector(".panel-left");
+  splitter.addEventListener("mousedown", (e) => {
+    const startX = e.clientX,
+      startW = panelLeft.offsetWidth;
+    const onMove = (e) => (panelLeft.style.width = `${startW + e.clientX - startX}px`);
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
   });
 
-  const STORAGE_KEY = 'ar-turtle-code';
+  const STORAGE_KEY = "ar-turtle-code";
   const savedCode = localStorage.getItem(STORAGE_KEY);
-  const initialCode = savedCode ?? document.getElementById('code_text').innerHTML.trim();
+  const initialCode = savedCode ?? document.getElementById("code_text").innerHTML.trim();
 
-  const editor = CodeMirror(document.getElementById('editor'), {
-    mode: 'javascript',
+  const editor = CodeMirror(document.getElementById("editor"), {
+    mode: "javascript",
     lineNumbers: true,
     value: initialCode,
-    extraKeys: { 'Ctrl-Space': 'autocomplete' },
+    extraKeys: { "Ctrl-Space": "autocomplete" },
     hintOptions: { hint: turtleHint, completeSingle: false },
   });
 
   let saveTimer;
-  editor.on('change', () => {
+  editor.on("change", () => {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => localStorage.setItem(STORAGE_KEY, editor.getValue()), 500);
   });
 
-  editor.on('inputRead', (cm, change) => {
-    if (change.text[0] === '.') {
+  editor.on("inputRead", (cm, change) => {
+    if (change.text[0] === ".") {
       CodeMirror.commands.autocomplete(cm, turtleHint, { completeSingle: false });
     }
   });
-  editor.setOption('lint', true);
+  editor.setOption("lint", true);
 
   let currentScript = null;
   let currentStream = null;
 
-  const turtleCanvas = document.getElementById('turtle');
-  const canvasWrapper = document.getElementById('canvasWrapper');
+  const turtleCanvas = document.getElementById("turtle");
+  const canvasWrapper = document.getElementById("canvasWrapper");
 
   // Keep wrapper square and within panel bounds.
   new ResizeObserver(([entry]) => {
     const { width, height } = entry.contentRect;
     const size = Math.min(width, height);
-    canvasWrapper.style.width  = `${size}px`;
+    canvasWrapper.style.width = `${size}px`;
     canvasWrapper.style.height = `${size}px`;
-  }).observe(document.getElementById('fsContainer'));
+  }).observe(document.getElementById("fsContainer"));
 
   // ── Fullscreen ────────────────────────────────────────────────────────────────
-  document.getElementById('fullscreenBtn').addEventListener('click', () => {
+  document.getElementById("fullscreenBtn").addEventListener("click", () => {
     if (!document.fullscreenElement) {
-      document.getElementById('fsContainer').requestFullscreen();
+      document.getElementById("fsContainer").requestFullscreen();
     } else {
       document.exitFullscreen();
     }
   });
 
-  document.addEventListener('fullscreenchange', () => {
+  document.addEventListener("fullscreenchange", () => {
     const inFs = !!document.fullscreenElement;
-    document.getElementById('fullscreenBtn').textContent = inFs ? 'Exit Fullscreen' : 'Fullscreen';
-    document.getElementById('fullscreenBtn').classList.toggle('active', inFs);
+    document.getElementById("fullscreenBtn").textContent = inFs ? "Exit Fullscreen" : "Fullscreen";
+    document.getElementById("fullscreenBtn").classList.toggle("active", inFs);
     // On exit, inline styles restore; update sprite for restored size.
     if (!inFs) updateSprite();
   });
 
   // ── Webcam ─────────────────────────────────────────────────────────────────
-  const video = document.createElement('video');
+  const video = document.createElement("video");
   video.autoplay = true;
   video.playsInline = true;
 
-  const cameraCanvas = document.getElementById('camera');
-  const cameraCtx = cameraCanvas.getContext('2d');
+  const cameraCanvas = document.getElementById("camera");
+  const cameraCtx = cameraCanvas.getContext("2d");
   let rafId = null;
 
   const drawFrame = () => {
@@ -208,26 +224,27 @@ window.onload = () => {
   let cameraOn = false;
 
   const startCamera = (deviceId) => {
-    currentStream?.getTracks().forEach(t => t.stop());
+    currentStream?.getTracks().forEach((t) => t.stop());
     currentStream = null;
     const constraints = { video: deviceId ? { deviceId: { exact: deviceId } } : true };
-    navigator.mediaDevices.getUserMedia(constraints)
+    navigator.mediaDevices
+      .getUserMedia(constraints)
       .then((stream) => {
         currentStream = stream;
         video.srcObject = stream;
-        document.getElementById('cameraToggle').style.display = '';
+        document.getElementById("cameraToggle").style.display = "";
         if (cameraOn && !rafId) drawFrame();
         return navigator.mediaDevices.enumerateDevices();
       })
       .then(populateCameras)
-      .catch((err) => console.warn('Camera unavailable:', err.message));
+      .catch((err) => console.warn("Camera unavailable:", err.message));
   };
 
-  document.getElementById('cameraToggle').addEventListener('click', () => {
+  document.getElementById("cameraToggle").addEventListener("click", () => {
     cameraOn = !cameraOn;
-    const toggle = document.getElementById('cameraToggle');
-    toggle.textContent = cameraOn ? 'Turn Camera Off' : 'Turn Camera On';
-    toggle.classList.toggle('active', cameraOn);
+    const toggle = document.getElementById("cameraToggle");
+    toggle.textContent = cameraOn ? "Turn Camera Off" : "Turn Camera On";
+    toggle.classList.toggle("active", cameraOn);
     if (cameraOn) {
       if (!rafId) drawFrame();
     } else {
@@ -238,22 +255,21 @@ window.onload = () => {
   });
 
   const populateCameras = (devices) => {
-    const videoDevices = devices.filter(d => d.kind === 'videoinput');
-    const select = document.getElementById('cameraSelect');
+    const videoDevices = devices.filter((d) => d.kind === "videoinput");
+    const select = document.getElementById("cameraSelect");
     const current = select.value;
-    select.innerHTML = '';
+    select.innerHTML = "";
     videoDevices.forEach((device, i) => {
-      const opt = document.createElement('option');
+      const opt = document.createElement("option");
       opt.value = device.deviceId;
       opt.text = device.label || `Camera ${i + 1}`;
       if (opt.value === current) opt.selected = true;
       select.appendChild(opt);
     });
-    document.getElementById('cameraWrapper').style.display =
-      videoDevices.length > 1 ? '' : 'none';
+    document.getElementById("cameraWrapper").style.display = videoDevices.length > 1 ? "" : "none";
   };
 
-  document.getElementById('cameraSelect').addEventListener('change', function () {
+  document.getElementById("cameraSelect").addEventListener("change", function () {
     startCamera(this.value);
   });
 
@@ -262,37 +278,41 @@ window.onload = () => {
   }
 
   // ── Console capture ───────────────────────────────────────────────────────
-  const consoleEl = document.getElementById('console');
-  const _log   = console.log.bind(console);
+  const consoleEl = document.getElementById("console");
+  const _log = console.log.bind(console);
   const _error = console.error.bind(console);
   const _clear = console.clear.bind(console);
 
   const appendConsole = (html) => {
-    consoleEl.innerHTML += (consoleEl.innerHTML ? '<br>' : '') + html;
+    consoleEl.innerHTML += (consoleEl.innerHTML ? "<br>" : "") + html;
     consoleEl.scrollTop = consoleEl.scrollHeight;
   };
 
-  window.clearConsole = () => { consoleEl.innerHTML = ''; };
+  window.clearConsole = () => {
+    consoleEl.innerHTML = "";
+  };
 
   console.log = (...args) => {
-    const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)).join(' ');
+    const msg = args
+      .map((a) => (typeof a === "object" ? JSON.stringify(a, null, 2) : String(a)))
+      .join(" ");
     appendConsole(msg);
     _log(...args);
   };
   console.error = (...args) => {
-    const msg = args.map(a => String(a)).join(' ');
+    const msg = args.map((a) => String(a)).join(" ");
     appendConsole(`<span class="err">${msg}</span>`);
     _error(...args);
   };
   console.clear = () => {
-    consoleEl.innerHTML = '';
+    consoleEl.innerHTML = "";
     _clear();
   };
 
   // ── Execute / Stop Running / Reset ───────────────────────────────────────
   // States: 'idle' → 'running' → 'stopped' → 'idle'
-  const executeBtn = document.getElementById('execute');
-  let btnState = 'idle';
+  const executeBtn = document.getElementById("execute");
+  let btnState = "idle";
   let idleWatcher = null;
 
   // Patch window.setInterval/clearInterval so we can track active user intervals.
@@ -311,22 +331,25 @@ window.onload = () => {
   };
 
   const unpatchTimers = () => {
-    window.setInterval  = _nativeSetInterval;
+    window.setInterval = _nativeSetInterval;
     window.clearInterval = _nativeClearInterval;
     window.__ar_intervals = new Set();
   };
 
   const setIdle = () => {
-    btnState = 'idle';
-    executeBtn.textContent = 'Execute Program';
-    executeBtn.style.backgroundColor = 'green';
+    btnState = "idle";
+    executeBtn.textContent = "Execute Program";
+    executeBtn.style.backgroundColor = "green";
   };
 
   const setStopped = () => {
-    if (idleWatcher) { _nativeClearInterval(idleWatcher); idleWatcher = null; }
-    btnState = 'stopped';
-    executeBtn.textContent = 'Reset';
-    executeBtn.style.backgroundColor = '#b00';
+    if (idleWatcher) {
+      _nativeClearInterval(idleWatcher);
+      idleWatcher = null;
+    }
+    btnState = "stopped";
+    executeBtn.textContent = "Reset";
+    executeBtn.style.backgroundColor = "#b00";
   };
 
   const stopRunning = () => {
@@ -339,7 +362,7 @@ window.onload = () => {
 
   const reset = () => {
     unpatchTimers();
-    window.__ar_turtles?.forEach(t => t.stop());
+    window.__ar_turtles?.forEach((t) => t.stop());
     window.__ar_turtles = [];
     for (let i = 1; i < 999999; i++) _nativeClearInterval(i);
     idleWatcher = null;
@@ -347,13 +370,13 @@ window.onload = () => {
       document.body.removeChild(currentScript);
       currentScript = null;
     }
-    turtleCanvas.getContext('2d').clearRect(0, 0, turtleCanvas.width, turtleCanvas.height);
+    turtleCanvas.getContext("2d").clearRect(0, 0, turtleCanvas.width, turtleCanvas.height);
     setIdle();
   };
 
   const execute = () => {
     reset();
-    consoleEl.innerHTML = '';
+    consoleEl.innerHTML = "";
     patchTimers();
 
     const raw = editor.getValue();
@@ -365,18 +388,19 @@ window.onload = () => {
     }
 
     // .then() handles no-turtle, no-interval programs (pure console.log etc)
-    const code = `(async function(){\n${protected_code}\n})()`
-      + `.catch(e => console.error(e))`
-      + `.then(() => window.__ar_iifeDone?.());`;
+    const code =
+      `(async function(){\n${protected_code}\n})()` +
+      `.catch(e => console.error(e))` +
+      `.then(() => window.__ar_iifeDone?.());`;
 
     window.__ar_iifeDone = () => {
-      if (btnState !== 'running') return;
-      const turtles   = window.__ar_turtles  ?? [];
+      if (btnState !== "running") return;
+      const turtles = window.__ar_turtles ?? [];
       const intervals = window.__ar_intervals ?? new Set();
       if (turtles.length === 0 && intervals.size === 0) setStopped();
     };
 
-    const script = document.createElement('script');
+    const script = document.createElement("script");
     try {
       script.appendChild(document.createTextNode(code));
     } catch (e) {
@@ -384,31 +408,36 @@ window.onload = () => {
     }
     document.body.appendChild(script);
     currentScript = script;
-    btnState = 'running';
-    executeBtn.textContent = 'Stop Running';
-    executeBtn.style.backgroundColor = '#c07000';
+    btnState = "running";
+    executeBtn.textContent = "Stop Running";
+    executeBtn.style.backgroundColor = "#c07000";
 
     // Poll for turtle queue idle AND no active user intervals.
     idleWatcher = _nativeSetInterval(() => {
-      if (btnState !== 'running') { _nativeClearInterval(idleWatcher); idleWatcher = null; return; }
-      const turtles   = window.__ar_turtles  ?? [];
+      if (btnState !== "running") {
+        _nativeClearInterval(idleWatcher);
+        idleWatcher = null;
+        return;
+      }
+      const turtles = window.__ar_turtles ?? [];
       const intervals = window.__ar_intervals ?? new Set();
-      if (turtles.length > 0 && turtles.every(t => t.isIdle) && intervals.size === 0) setStopped();
+      if (turtles.length > 0 && turtles.every((t) => t.isIdle) && intervals.size === 0)
+        setStopped();
     }, 300);
   };
 
   // ── Mode switching (Text ↔ Blocks) ───────────────────────────────────────
-  const modeSelect   = document.getElementById('modeSelect');
-  const editorEl     = document.getElementById('editor');
-  const blocklyArea  = document.getElementById('blockly-area');
-  const blocklyDiv   = document.getElementById('blockly-div');
-  const panelRight   = document.querySelector('.panel-right');
-  const splitterEl   = document.querySelector('.splitter');
+  const modeSelect = document.getElementById("modeSelect");
+  const editorEl = document.getElementById("editor");
+  const blocklyArea = document.getElementById("blockly-area");
+  const blocklyDiv = document.getElementById("blockly-div");
+  const panelRight = document.querySelector(".panel-right");
+  const splitterEl = document.querySelector(".splitter");
 
-  const BLOCKS_STORAGE_KEY = 'ar-turtle-blocks';
+  const BLOCKS_STORAGE_KEY = "ar-turtle-blocks";
 
   let blocklyWorkspace = null;
-  let currentMode = 'text';
+  let currentMode = "text";
   // Last code that was synced INTO the workspace — used to detect external edits.
   let lastSyncedCode = null;
 
@@ -416,17 +445,23 @@ window.onload = () => {
     if (blocklyWorkspace) return;
     blocklyWorkspace = window.__ar_blocklyWorkspace = Blockly.inject(blocklyDiv, {
       toolbox: TOOLBOX,
-      grid: { spacing: 20, length: 3, colour: '#ccc', snap: true },
+      grid: { spacing: 20, length: 3, colour: "#ccc", snap: true },
       zoom: { controls: true, wheel: true, startScale: 1.0 },
       trashcan: true,
       scrollbars: true,
     });
+    // Ensure a default Turtle-typed variable exists for new workspaces.
+    if (!blocklyWorkspace.variableMap.getVariable("turtle", "Turtle")) {
+      blocklyWorkspace.variableMap.createVariable("turtle", "Turtle");
+    }
     // Restore saved workspace state
     const saved = localStorage.getItem(BLOCKS_STORAGE_KEY);
     if (saved) {
       try {
         Blockly.serialization.workspaces.load(JSON.parse(saved), blocklyWorkspace);
-      } catch (_) { /* ignore corrupt state */ }
+      } catch (_) {
+        /* ignore corrupt state */
+      }
     }
     blocklyWorkspace.addChangeListener(() => {
       if (blocklyWorkspace.isDragging()) return;
@@ -439,11 +474,16 @@ window.onload = () => {
 
   function blocksToText() {
     if (!blocklyWorkspace) return;
-    const body = javascriptGenerator.workspaceToCode(blocklyWorkspace).trim();
-    const generated = body
-      ? `const turtle = new Turtle();\n${body}`
-      : 'const turtle = new Turtle();\n';
-    editor.setValue(generated);
+    let generated = javascriptGenerator.workspaceToCode(blocklyWorkspace).trim();
+    // Blockly auto-declares all variables with `var`; Turtle vars are declared as
+    // `const` by turtle_create blocks, so strip the conflicting var declarations.
+    const turtleVarNames = blocklyWorkspace.variableMap
+      .getVariablesOfType("Turtle")
+      .map((v) => v.name);
+    for (const name of turtleVarNames) {
+      generated = generated.replace(new RegExp(`^var ${name};\\n?`, "m"), "");
+    }
+    editor.setValue(generated.trim() || "const turtle = new Turtle();\n");
   }
 
   function switchToBlocks() {
@@ -466,45 +506,47 @@ window.onload = () => {
         } catch (_) {}
       }
     }
-    editorEl.style.display    = 'none';
-    blocklyArea.style.display = 'block';
+    editorEl.style.display = "none";
+    blocklyArea.style.display = "block";
     setTimeout(() => Blockly.svgResize(blocklyWorkspace), 0);
-    currentMode = 'blocks';
+    currentMode = "blocks";
   }
 
   function switchToText() {
     blocksToText();
     lastSyncedCode = editor.getValue();
-    editorEl.style.display    = '';
-    blocklyArea.style.display = 'none';
+    editorEl.style.display = "";
+    blocklyArea.style.display = "none";
     editor.refresh();
-    currentMode = 'text';
+    currentMode = "text";
   }
 
   const executeInMode = () => {
-    if (currentMode === 'blocks') { blocksToText(); execute(); }
-    else execute();
+    if (currentMode === "blocks") {
+      blocksToText();
+      execute();
+    } else execute();
   };
 
   // Single execute button listener (mode-aware)
-  executeBtn.addEventListener('click', () => {
-    if (btnState === 'idle')         executeInMode();
-    else if (btnState === 'running') stopRunning();
-    else                             reset();
+  executeBtn.addEventListener("click", () => {
+    if (btnState === "idle") executeInMode();
+    else if (btnState === "running") stopRunning();
+    else reset();
   });
 
-  modeSelect.addEventListener('change', () => {
+  modeSelect.addEventListener("change", () => {
     reset();
-    if (modeSelect.value === 'blocks') switchToBlocks();
+    if (modeSelect.value === "blocks") switchToBlocks();
     else switchToText();
   });
 
   // Blockly must be notified of any left-panel size change (splitter drag or window resize)
   new ResizeObserver(() => {
-    if (currentMode === 'blocks' && blocklyWorkspace) Blockly.svgResize(blocklyWorkspace);
+    if (currentMode === "blocks" && blocklyWorkspace) Blockly.svgResize(blocklyWorkspace);
   }).observe(panelLeft);
 
-  window.addEventListener('resize', () => {
-    if (currentMode === 'blocks' && blocklyWorkspace) Blockly.svgResize(blocklyWorkspace);
+  window.addEventListener("resize", () => {
+    if (currentMode === "blocks" && blocklyWorkspace) Blockly.svgResize(blocklyWorkspace);
   });
 };

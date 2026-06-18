@@ -6,15 +6,15 @@ Modernized to ES2022 by the ar-turtle project.
 */
 
 export class Turtle {
-  constructor(canvas = document.getElementById('turtle')) {
-    const ctx = canvas.getContext('2d');
+  constructor(canvas = document.getElementById("turtle")) {
+    const ctx = canvas.getContext("2d");
     const canvasWidth = canvas.width;
     const canvasHeight = canvas.height;
-    ctx.lineCap = 'round';
+    ctx.lineCap = "round";
 
-    const DEFAULT_FG = '#000';
-    const DEFAULT_BG = '#fff';
-    const DEFAULT_WIDTH = '1';
+    const DEFAULT_FG = "#000";
+    const DEFAULT_BG = "#fff";
+    const DEFAULT_WIDTH = "1";
     const origin = {
       x: Math.floor(canvasWidth / 2) + 0.5,
       y: Math.floor(canvasHeight / 2) + 0.5,
@@ -31,7 +31,7 @@ export class Turtle {
 
     // ── Event system ─────────────────────────────────────────────────────────
     const trigger = (ev, ...args) => {
-      events[ev]?.forEach(h => h.apply(this, args));
+      events[ev]?.forEach((h) => h.apply(this, args));
     };
 
     this.on = (ev, handler) => {
@@ -60,12 +60,18 @@ export class Turtle {
           setTimeout(run, 0);
         } else {
           queueActive = false;
-          if (funs.length > 0) { funs.length = 0; at = 0; }
+          if (funs.length > 0) {
+            funs.length = 0;
+            at = 0;
+          }
           setTimeout(run, 200);
         }
       };
       run();
-      return (fn) => { funs.push(fn); queueActive = true; };
+      return (fn) => {
+        funs.push(fn);
+        queueActive = true;
+      };
     })();
 
     // ── Low-level draw ───────────────────────────────────────────────────────
@@ -74,14 +80,20 @@ export class Turtle {
       let oldX, oldY, oldFg, oldWidth;
       return (args) => {
         ctx.beginPath();
-        if (args.fg !== oldFg) { ctx.strokeStyle = args.fg; oldFg = args.fg; }
-        if (args.width !== oldWidth) { ctx.lineWidth = args.width; oldWidth = args.width; }
+        if (args.fg !== oldFg) {
+          ctx.strokeStyle = args.fg;
+          oldFg = args.fg;
+        }
+        if (args.width !== oldWidth) {
+          ctx.lineWidth = args.width;
+          oldWidth = args.width;
+        }
         ctx.moveTo(oldX, oldY);
         ctx.lineTo(args.x, args.y);
         if (args.pd) ctx.stroke();
         oldX = args.x;
         oldY = args.y;
-        trigger('move', args);
+        trigger("move", args);
       };
     })();
 
@@ -102,14 +114,23 @@ export class Turtle {
     };
     this.backward = (amount) => this.forward(-amount);
 
-    this.xy = (x, y) => { moveTo(origin.x + x, origin.y - y); return this; };
-    this.x  = (x)    => { moveTo(origin.x + x, pos.y);        return this; };
-    this.y  = (y)    => { moveTo(pos.x, origin.y - y);        return this; };
+    this.xy = (x, y) => {
+      moveTo(origin.x + x, origin.y - y);
+      return this;
+    };
+    this.x = (x) => {
+      moveTo(origin.x + x, pos.y);
+      return this;
+    };
+    this.y = (y) => {
+      moveTo(pos.x, origin.y - y);
+      return this;
+    };
 
     this.heading = (deg) => {
       heading = -deg * (Math.PI / 180);
       const absDeg = this.get.heading();
-      q(() => trigger('rotate', absDeg));
+      q(() => trigger("rotate", absDeg));
       return this;
     };
 
@@ -117,7 +138,7 @@ export class Turtle {
       const absX = origin.x + x;
       const absY = origin.y - y;
       heading = Math.atan2(pos.x - absX, pos.y - absY);
-      q(() => trigger('rotate', heading * (180 / Math.PI)));
+      q(() => trigger("rotate", heading * (180 / Math.PI)));
       return this;
     };
 
@@ -125,7 +146,7 @@ export class Turtle {
       const absX = origin.x + x;
       const absY = origin.y - y;
       heading = Math.atan2(pos.x - absX, pos.y - absY) + Math.PI;
-      q(() => trigger('rotate', heading * (180 / Math.PI)));
+      q(() => trigger("rotate", heading * (180 / Math.PI)));
       return this;
     };
 
@@ -156,18 +177,32 @@ export class Turtle {
     this.right = (deg) => {
       heading -= deg * (Math.PI / 180);
       const absDeg = this.get.heading();
-      q(() => trigger('rotate', absDeg));
+      q(() => trigger("rotate", absDeg));
       return this;
     };
     this.left = (deg) => this.right(-deg);
 
     // ── Pen ──────────────────────────────────────────────────────────────────
-    this.pu = () => { penDown = false; q(() => trigger('pu')); return this; };
-    this.pd = () => { penDown = true;  q(() => trigger('pd')); return this; };
+    this.pu = () => {
+      penDown = false;
+      q(() => trigger("pu"));
+      return this;
+    };
+    this.pd = () => {
+      penDown = true;
+      q(() => trigger("pd"));
+      return this;
+    };
 
     // ── Style ────────────────────────────────────────────────────────────────
-    this.color     = (c) => { foreground = c; return this; };
-    this.thickness = (w) => { width = w;      return this; };
+    this.color = (c) => {
+      foreground = c;
+      return this;
+    };
+    this.thickness = (w) => {
+      width = w;
+      return this;
+    };
 
     this.clean = (color) => {
       if (color) background = color;
@@ -185,49 +220,59 @@ export class Turtle {
       pos.x = origin.x;
       pos.y = origin.y;
       const args = { x: pos.x, y: pos.y, pd: false, width, fg: foreground };
-      q(() => { go(args); trigger('rotate', 0); });
+      q(() => {
+        go(args);
+        trigger("rotate", 0);
+      });
       return this;
     };
 
     this.clear = () => this.clean().home().pd();
 
     this.reset = this.init = () => {
-      background = 'transparent';
+      background = "transparent";
       return this.color(DEFAULT_FG).thickness(DEFAULT_WIDTH).clear();
     };
 
     // ── Sprite ───────────────────────────────────────────────────────────────
-    const sprite = document.createElement('span');
+    const sprite = document.createElement("span");
     Object.assign(sprite.style, {
       backgroundImage: "url('turtle.png')",
-      width: '41px', height: '41px', margin: '-21px',
-      transformOrigin: '50% 50%',
-      position: 'absolute', zIndex: '31',
+      width: "41px",
+      height: "41px",
+      margin: "-21px",
+      transformOrigin: "50% 50%",
+      position: "absolute",
+      zIndex: "31",
     });
     canvas.parentElement?.appendChild(sprite);
 
     const scale = () => canvas.clientWidth / canvas.width;
-    this.on('move',   t   => {
+    this.on("move", (t) => {
       const s = scale();
       sprite.style.left = `${t.x * s}px`;
-      sprite.style.top  = `${t.y * s}px`;
+      sprite.style.top = `${t.y * s}px`;
     });
-    this.on('rotate', deg => {
+    this.on("rotate", (deg) => {
       sprite.style.transform = `rotate(${Math.round(deg)}deg)`;
     });
 
     const ro = new ResizeObserver(() => {
       const s = scale();
       sprite.style.left = `${pos.x * s}px`;
-      sprite.style.top  = `${pos.y * s}px`;
+      sprite.style.top = `${pos.y * s}px`;
     });
     ro.observe(canvas.parentElement);
 
     (window.__ar_turtles ??= []).push(this);
 
-    Object.defineProperty(this, 'isIdle', { get: () => !queueActive });
+    Object.defineProperty(this, "isIdle", { get: () => !queueActive });
 
-    this.stop = () => { stopped = true; sprite.remove(); ro.disconnect(); };
+    this.stop = () => {
+      stopped = true;
+      sprite.remove();
+      ro.disconnect();
+    };
 
     // ── Loopers ──────────────────────────────────────────────────────────────
     this.repeat = (amount, fn) => {
@@ -251,19 +296,18 @@ export class Turtle {
 
     // ── Getters ──────────────────────────────────────────────────────────────
     this.get = {
-      x:          () => pos.x - origin.x,
-      y:          () => origin.y - pos.y,
-      heading:    () => -heading * (180 / Math.PI),
-      pu:         () => !penDown,
-      pd:         () => penDown,
-      thickness:  () => width,
-      color:      () => foreground,
+      x: () => pos.x - origin.x,
+      y: () => origin.y - pos.y,
+      heading: () => -heading * (180 / Math.PI),
+      pu: () => !penDown,
+      pd: () => penDown,
+      thickness: () => width,
+      color: () => foreground,
       background: () => background,
-      oob: () =>
-        pos.x > canvasWidth || pos.y > canvasHeight || pos.x < 0 || pos.y < 0,
-      top:    () => origin.y,
-      left:   () => -origin.x,
-      right:  () => origin.x,
+      oob: () => pos.x > canvasWidth || pos.y > canvasHeight || pos.x < 0 || pos.y < 0,
+      top: () => origin.y,
+      left: () => -origin.x,
+      right: () => origin.x,
       bottom: () => -origin.y,
     };
 
@@ -277,24 +321,33 @@ export class Turtle {
           const v = Math.random() * 2 - 1;
           const r = u * u + v * v;
           if (r === 0 || r >= 1) continue;
-          const c = Math.sqrt(-2 * Math.log(r) / r);
-          _u = u * c; _v = v * c;
+          const c = Math.sqrt((-2 * Math.log(r)) / r);
+          _u = u * c;
+          _v = v * c;
           return;
         }
       };
       return () => {
         if (_u === undefined && _v === undefined) generate();
-        if (_u !== undefined) { const r = _u; _u = undefined; return r; }
-        const r = _v; _v = undefined; return r;
+        if (_u !== undefined) {
+          const r = _u;
+          _u = undefined;
+          return r;
+        }
+        const r = _v;
+        _v = undefined;
+        return r;
       };
     })();
 
     this.rand = {
-      uni:    (lower, upper) => {
-        if (upper === undefined) { [lower, upper] = [0, lower]; }
+      uni: (lower, upper) => {
+        if (upper === undefined) {
+          [lower, upper] = [0, lower];
+        }
         return Math.random() * (upper - lower) + lower;
       },
-      norm:   (mean, stdDev) => mean + normal() * stdDev,
+      norm: (mean, stdDev) => mean + normal() * stdDev,
       chance: (odds) => Math.random() < odds,
     };
 

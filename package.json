@@ -9,8 +9,6 @@
     "test": "vitest run"
   },
   "devDependencies": {
-    "jest": "^29.7.0",
-    "jest-environment-jsdom": "^29.7.0",
     "jsdom": "^29.1.1",
     "oxfmt": "^0.55.0",
     "oxlint": "^1.70.0",
@@ -21,6 +19,7 @@
     "@blockly/field-angle": "^6.0.9",
     "@blockly/field-colour": "^6.0.12",
     "@blockly/field-slider": "^8.0.9",
-    "blockly": "^13.0.0"
+    "blockly": "^13.0.0",
+    "esprima": "^4.0.1"
   }
 }
