@@ -43,6 +43,7 @@ export class Turtle {
     // ── Queue ────────────────────────────────────────────────────────────────
     // Processes one action per tick (or batches when the queue is very long).
     // The idle poll (200 ms) keeps the loop alive between bursts.
+    let queueActive = false;
     const q = (() => {
       const funs = [];
       let at = 0;
@@ -50,6 +51,7 @@ export class Turtle {
         if (stopped) return;
         const len = funs.length - at;
         if (len > 0) {
+          queueActive = true;
           if (len > 500) {
             for (let i = 0; i < len / 250; i++) funs[at++]();
           } else {
@@ -57,12 +59,13 @@ export class Turtle {
           }
           setTimeout(run, 0);
         } else {
+          queueActive = false;
           if (funs.length > 0) { funs.length = 0; at = 0; }
           setTimeout(run, 200);
         }
       };
       run();
-      return (fn) => funs.push(fn);
+      return (fn) => { funs.push(fn); queueActive = true; };
     })();
 
     // ── Low-level draw ───────────────────────────────────────────────────────
@@ -221,6 +224,8 @@ export class Turtle {
     ro.observe(canvas.parentElement);
 
     (window.__ar_turtles ??= []).push(this);
+
+    Object.defineProperty(this, 'isIdle', { get: () => !queueActive });
 
     this.stop = () => { stopped = true; sprite.remove(); ro.disconnect(); };
 

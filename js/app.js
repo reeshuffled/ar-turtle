@@ -1,4 +1,9 @@
 import { Turtle } from './turtle.js';
+import esprima from 'esprima';
+
+// Capture native timer functions before any user-code patching.
+const _nativeSetInterval  = window.setInterval.bind(window);
+const _nativeClearInterval = window.clearInterval.bind(window);
 
 // Expose Turtle on window so user code in the editor can call `new Turtle(c)`.
 window.Turtle = Turtle;
@@ -31,6 +36,47 @@ const TURTLE_COMPLETIONS = [
   { text: 'rand',      displayText: 'rand — randoms: .uni(lo,hi) .norm(mean,sd) .chance(odds)' },
   { text: 'on',        displayText: 'on(event, fn) — listen to: "move", "rotate", "pu", "pd"' },
 ];
+
+// https://github.com/chinchang/web-maker/blob/master/src/utils.js
+function addInfiniteLoopProtection(code, timeout = 2000) {
+  let loopId = 1;
+  let patches = [];
+  const varPrefix = '_wmloopvar';
+  const varStr = 'var %d = Date.now();\n';
+  const checkStr = `\nif (Date.now() - %d > ${timeout}) { window.stopRunning(); throw new Error("Infinite loop detected. Please make changes and press Execute Program when you are ready to try again."); break;}\n`;
+
+  esprima.parseScript(code, { tolerant: true, range: true }, (node) => {
+    switch (node.type) {
+      case 'DoWhileStatement':
+      case 'ForStatement':
+      case 'ForInStatement':
+      case 'ForOfStatement':
+      case 'WhileStatement': {
+        let start = 1 + node.body.range[0];
+        let end = node.body.range[1];
+        let prolog = checkStr.replace('%d', varPrefix + loopId);
+        let epilog = '';
+        if (node.body.type !== 'BlockStatement') {
+          prolog = '{' + prolog;
+          epilog = '}';
+          --start;
+        }
+        patches.push({ pos: start, str: prolog });
+        patches.push({ pos: end,   str: epilog });
+        patches.push({ pos: node.range[0], str: varStr.replace('%d', varPrefix + loopId) });
+        ++loopId;
+        break;
+      }
+      default: break;
+    }
+  });
+
+  patches
+    .sort((a, b) => b.pos - a.pos)
+    .forEach(p => { code = code.slice(0, p.pos) + p.str + code.slice(p.pos); });
+
+  return code;
+}
 
 function getTurtleVarNames(cm) {
   const names = new Set();
@@ -73,9 +119,15 @@ function turtleHint(cm, options) {
 }
 
 window.onload = () => {
-  $('.panel-left').resizable({
-    handleSelector: '.splitter',
-    resizeHeight: false,
+  const splitter = document.querySelector('.splitter');
+  const panelLeft = document.querySelector('.panel-left');
+  splitter.addEventListener('mousedown', (e) => {
+    const startX = e.clientX, startW = panelLeft.offsetWidth;
+    const onMove = (e) => panelLeft.style.width = `${startW + e.clientX - startX}px`;
+    const onUp   = () => { document.removeEventListener('mousemove', onMove);
+                           document.removeEventListener('mouseup', onUp); };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
   });
 
   const STORAGE_KEY = 'ar-turtle-code';
@@ -115,7 +167,7 @@ window.onload = () => {
     const size = Math.min(width, height);
     canvasWrapper.style.width  = `${size}px`;
     canvasWrapper.style.height = `${size}px`;
-  }).observe(document.querySelector('.panel-right'));
+  }).observe(document.getElementById('fsContainer'));
 
   // ── Fullscreen ────────────────────────────────────────────────────────────────
   document.getElementById('fullscreenBtn').addEventListener('click', () => {
@@ -206,27 +258,121 @@ window.onload = () => {
     startCamera(null);
   }
 
-  // ── Execute / Reset ───────────────────────────────────────────────────────
+  // ── Console capture ───────────────────────────────────────────────────────
+  const consoleEl = document.getElementById('console');
+  const _log   = console.log.bind(console);
+  const _error = console.error.bind(console);
+  const _clear = console.clear.bind(console);
+
+  const appendConsole = (html) => {
+    consoleEl.innerHTML += (consoleEl.innerHTML ? '<br>' : '') + html;
+    consoleEl.scrollTop = consoleEl.scrollHeight;
+  };
+
+  window.clearConsole = () => { consoleEl.innerHTML = ''; };
+
+  console.log = (...args) => {
+    const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)).join(' ');
+    appendConsole(msg);
+    _log(...args);
+  };
+  console.error = (...args) => {
+    const msg = args.map(a => String(a)).join(' ');
+    appendConsole(`<span class="err">${msg}</span>`);
+    _error(...args);
+  };
+  console.clear = () => {
+    consoleEl.innerHTML = '';
+    _clear();
+  };
+
+  // ── Execute / Stop Running / Reset ───────────────────────────────────────
+  // States: 'idle' → 'running' → 'stopped' → 'idle'
   const executeBtn = document.getElementById('execute');
-  let running = false;
+  let btnState = 'idle';
+  let idleWatcher = null;
+
+  // Patch window.setInterval/clearInterval so we can track active user intervals.
+  // Uses _nativeSetInterval so our own idleWatcher is invisible to the tracker.
+  const patchTimers = () => {
+    window.__ar_intervals = new Set();
+    window.setInterval = (...args) => {
+      const id = _nativeSetInterval(...args);
+      window.__ar_intervals.add(id);
+      return id;
+    };
+    window.clearInterval = (id) => {
+      window.__ar_intervals?.delete(id);
+      _nativeClearInterval(id);
+    };
+  };
+
+  const unpatchTimers = () => {
+    window.setInterval  = _nativeSetInterval;
+    window.clearInterval = _nativeClearInterval;
+    window.__ar_intervals = new Set();
+  };
+
+  const setIdle = () => {
+    btnState = 'idle';
+    executeBtn.textContent = 'Execute Program';
+    executeBtn.style.backgroundColor = 'green';
+  };
+
+  const setStopped = () => {
+    if (idleWatcher) { _nativeClearInterval(idleWatcher); idleWatcher = null; }
+    btnState = 'stopped';
+    executeBtn.textContent = 'Reset';
+    executeBtn.style.backgroundColor = '#b00';
+  };
+
+  const stopRunning = () => {
+    unpatchTimers();
+    for (let i = 1; i < 999999; i++) _nativeClearInterval(i);
+    idleWatcher = null;
+    setStopped();
+  };
+  window.stopRunning = stopRunning;
 
   const reset = () => {
-    running = false;
+    unpatchTimers();
     window.__ar_turtles?.forEach(t => t.stop());
     window.__ar_turtles = [];
+    for (let i = 1; i < 999999; i++) _nativeClearInterval(i);
+    idleWatcher = null;
     if (currentScript) {
       document.body.removeChild(currentScript);
       currentScript = null;
     }
     turtleCanvas.getContext('2d').clearRect(0, 0, turtleCanvas.width, turtleCanvas.height);
-    executeBtn.textContent = 'Execute Program';
-    executeBtn.style.backgroundColor = 'green';
+    setIdle();
   };
 
   const execute = () => {
     reset();
-    // Wrap in IIFE so const/let don't pollute global scope on re-execution.
-    const code = `(function(){\n${editor.getValue()}\n})();`;
+    consoleEl.innerHTML = '';
+    patchTimers();
+
+    const raw = editor.getValue();
+    let protected_code;
+    try {
+      protected_code = addInfiniteLoopProtection(raw);
+    } catch (_) {
+      protected_code = raw;
+    }
+
+    // .then() handles no-turtle, no-interval programs (pure console.log etc)
+    const code = `(async function(){\n${protected_code}\n})()`
+      + `.catch(e => console.error(e))`
+      + `.then(() => window.__ar_iifeDone?.());`;
+
+    window.__ar_iifeDone = () => {
+      if (btnState !== 'running') return;
+      const turtles   = window.__ar_turtles  ?? [];
+      const intervals = window.__ar_intervals ?? new Set();
+      if (turtles.length === 0 && intervals.size === 0) setStopped();
+    };
+
     const script = document.createElement('script');
     try {
       script.appendChild(document.createTextNode(code));
@@ -235,12 +381,22 @@ window.onload = () => {
     }
     document.body.appendChild(script);
     currentScript = script;
-    running = true;
-    executeBtn.textContent = 'Reset';
-    executeBtn.style.backgroundColor = '#b00';
+    btnState = 'running';
+    executeBtn.textContent = 'Stop Running';
+    executeBtn.style.backgroundColor = '#c07000';
+
+    // Poll for turtle queue idle AND no active user intervals.
+    idleWatcher = _nativeSetInterval(() => {
+      if (btnState !== 'running') { _nativeClearInterval(idleWatcher); idleWatcher = null; return; }
+      const turtles   = window.__ar_turtles  ?? [];
+      const intervals = window.__ar_intervals ?? new Set();
+      if (turtles.length > 0 && turtles.every(t => t.isIdle) && intervals.size === 0) setStopped();
+    }, 300);
   };
 
   executeBtn.addEventListener('click', () => {
-    if (running) reset(); else execute();
+    if (btnState === 'idle')         execute();
+    else if (btnState === 'running') stopRunning();
+    else                             reset();
   });
 };
