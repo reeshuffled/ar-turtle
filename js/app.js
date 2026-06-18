@@ -44,6 +44,61 @@ const TURTLE_COMPLETIONS = [
   { text: "on", displayText: 'on(event, fn) — listen to: "move", "rotate", "pu", "pd"' },
 ];
 
+// ── Drag-to-text toolkit data ─────────────────────────────────────────────
+const TOOLKIT_CATEGORIES = [
+  {
+    name: "Turtle",
+    commands: [
+      { label: "create turtle", code: "const turtle = new Turtle();" },
+    ],
+  },
+  {
+    name: "Move",
+    commands: [
+      { label: "forward", code: "turtle.forward(50);" },
+      { label: "backward", code: "turtle.backward(50);" },
+      { label: "go to x, y", code: "turtle.xy(0, 0);" },
+      { label: "home", code: "turtle.home();" },
+      { label: "clear", code: "turtle.clear();" },
+      { label: "clean", code: "turtle.clean();" },
+    ],
+  },
+  {
+    name: "Turn",
+    commands: [
+      { label: "right 90°", code: "turtle.right(90);" },
+      { label: "left 90°", code: "turtle.left(90);" },
+      { label: "heading", code: "turtle.heading(0);" },
+      { label: "face x, y", code: "turtle.face(0, 0);" },
+    ],
+  },
+  {
+    name: "Pen",
+    commands: [
+      { label: "pen up", code: "turtle.pu();" },
+      { label: "pen down", code: "turtle.pd();" },
+      { label: "color", code: "turtle.color('red');" },
+      { label: "thickness", code: "turtle.thickness(2);" },
+    ],
+  },
+  {
+    name: "Draw",
+    commands: [
+      { label: "disc", code: "turtle.disc(20);" },
+      { label: "circle", code: "turtle.circle(20);" },
+    ],
+  },
+  {
+    name: "Control",
+    commands: [
+      { label: "repeat", code: "turtle.repeat(4, () => {\n  \n});" },
+      { label: "forever", code: "turtle.forever(() => {\n  \n});" },
+      { label: "set interval", code: "setInterval(() => {\n  \n}, 100);" },
+      { label: "set timeout", code: "setTimeout(() => {\n  \n}, 1000);" },
+    ],
+  },
+];
+
 // https://github.com/chinchang/web-maker/blob/master/src/utils.js
 function addInfiniteLoopProtection(code, timeout = 2000) {
   let loopId = 1;
@@ -86,6 +141,33 @@ function addInfiniteLoopProtection(code, timeout = 2000) {
     });
 
   return code;
+}
+
+function friendlyError(raw) {
+  const m = String(raw?.message ?? raw);
+  const dup = m.match(/Identifier ['"]?(\w+)['"]? has already been declared/);
+  if (dup) return `'${dup[1]}' is declared twice — remove the duplicate const/let/var line.`;
+
+  const notFn = m.match(/['"]([\w.]+)['"] is not a function|(\S+) is not a function/);
+  if (notFn) return `${notFn[1] ?? notFn[2]} is not a function — check the spelling.`;
+
+  const notDef = m.match(/(\w+) is not defined/);
+  if (notDef) return `'${notDef[1]}' is not defined — did you forget to create it?`;
+
+  const prop = m.match(/Cannot read propert(?:y|ies) of (undefined|null)(?: \(reading ['"](\w+)['"]\))?/);
+  if (prop) return prop[2]
+    ? `Tried to use .${prop[2]} on something that doesn't exist yet.`
+    : `Tried to use a property on something that doesn't exist yet.`;
+
+  if (m.includes("Unexpected token") || m.includes("Unexpected end of"))
+    return `Syntax error — check for missing or extra brackets, quotes, or commas.`;
+
+  if (m.includes("Unexpected identifier"))
+    return `Syntax error — unexpected word. Check for missing punctuation on the line above.`;
+
+  if (m.includes("Infinite loop detected")) return m;
+
+  return m.replace(/^(TypeError|SyntaxError|ReferenceError|RangeError|EvalError): /, "");
 }
 
 function getTurtleVarNames(cm) {
@@ -165,6 +247,48 @@ window.onload = () => {
   editor.on("change", () => {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => localStorage.setItem(STORAGE_KEY, editor.getValue()), 500);
+  });
+
+  // ── Build drag-to-text toolkit ────────────────────────────────────────────
+  const toolkitBody = document.getElementById("toolkit-body");
+  for (const cat of TOOLKIT_CATEGORIES) {
+    const catEl = document.createElement("div");
+    catEl.className = "toolkit-category";
+    catEl.textContent = cat.name;
+    toolkitBody.appendChild(catEl);
+    for (const cmd of cat.commands) {
+      const btn = document.createElement("div");
+      btn.className = "toolkit-btn";
+      btn.draggable = true;
+      btn.innerHTML = `<span>${cmd.label}</span><span class="toolkit-info">ℹ</span>`;
+      btn.addEventListener("dragstart", (e) => {
+        e.dataTransfer.setData("application/x-ar-toolkit", cmd.code);
+        e.dataTransfer.effectAllowed = "copy";
+        btn.classList.add("dragging");
+      });
+      btn.addEventListener("dragend", () => btn.classList.remove("dragging"));
+      toolkitBody.appendChild(btn);
+    }
+  }
+
+  // Drop code snippets onto CodeMirror
+  const cmWrapper = editor.getWrapperElement();
+  cmWrapper.addEventListener("dragover", (e) => {
+    if (e.dataTransfer.types.includes("application/x-ar-toolkit")) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+    }
+  });
+  cmWrapper.addEventListener("drop", (e) => {
+    const code = e.dataTransfer.getData("application/x-ar-toolkit");
+    if (!code) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const pos = editor.coordsChar({ left: e.clientX, top: e.clientY });
+    editor.focus();
+    const lines = code.split("\n");
+    editor.replaceRange(code + "\n", pos);
+    editor.setCursor({ line: pos.line + lines.length, ch: 0 });
   });
 
   editor.on("inputRead", (cm, change) => {
@@ -360,6 +484,21 @@ window.onload = () => {
   };
   window.stopRunning = stopRunning;
 
+  window.__ar_friendlyError = friendlyError;
+
+  window.onerror = (message, _source, _lineno, _colno, error) => {
+    if (btnState !== "running") return false;
+    console.error(`Error: ${friendlyError(error ?? message)}`);
+    stopRunning();
+    return false;
+  };
+
+  window.onunhandledrejection = (e) => {
+    if (btnState !== "running") return;
+    console.error(`Error: ${friendlyError(e.reason)}`);
+    stopRunning();
+  };
+
   const reset = () => {
     unpatchTimers();
     window.__ar_turtles?.forEach((t) => t.stop());
@@ -390,7 +529,7 @@ window.onload = () => {
     // .then() handles no-turtle, no-interval programs (pure console.log etc)
     const code =
       `(async function(){\n${protected_code}\n})()` +
-      `.catch(e => console.error(e))` +
+      `.catch(e => console.error("Error: " + window.__ar_friendlyError(e)))` +
       `.then(() => window.__ar_iifeDone?.());`;
 
     window.__ar_iifeDone = () => {
@@ -400,6 +539,10 @@ window.onload = () => {
       if (turtles.length === 0 && intervals.size === 0) setStopped();
     };
 
+    btnState = "running";
+    executeBtn.textContent = "Stop Running";
+    executeBtn.style.backgroundColor = "#c07000";
+
     const script = document.createElement("script");
     try {
       script.appendChild(document.createTextNode(code));
@@ -408,9 +551,6 @@ window.onload = () => {
     }
     document.body.appendChild(script);
     currentScript = script;
-    btnState = "running";
-    executeBtn.textContent = "Stop Running";
-    executeBtn.style.backgroundColor = "#c07000";
 
     // Poll for turtle queue idle AND no active user intervals.
     idleWatcher = _nativeSetInterval(() => {
@@ -435,6 +575,7 @@ window.onload = () => {
   const splitterEl = document.querySelector(".splitter");
 
   const BLOCKS_STORAGE_KEY = "ar-turtle-blocks";
+  const toolkitPanel = document.getElementById("toolkit-panel");
 
   let blocklyWorkspace = null;
   let currentMode = "text";
@@ -506,6 +647,7 @@ window.onload = () => {
         } catch (_) {}
       }
     }
+    toolkitPanel.style.display = "none";
     editorEl.style.display = "none";
     blocklyArea.style.display = "block";
     setTimeout(() => Blockly.svgResize(blocklyWorkspace), 0);
@@ -513,12 +655,27 @@ window.onload = () => {
   }
 
   function switchToText() {
-    blocksToText();
-    lastSyncedCode = editor.getValue();
+    if (currentMode === "blocks") {
+      blocksToText();
+      lastSyncedCode = editor.getValue();
+    }
+    toolkitPanel.style.display = "none";
     editorEl.style.display = "";
     blocklyArea.style.display = "none";
     editor.refresh();
     currentMode = "text";
+  }
+
+  function switchToDragToText() {
+    if (currentMode === "blocks") {
+      blocksToText();
+      lastSyncedCode = editor.getValue();
+    }
+    toolkitPanel.style.display = "";
+    editorEl.style.display = "";
+    blocklyArea.style.display = "none";
+    editor.refresh();
+    currentMode = "drag";
   }
 
   const executeInMode = () => {
@@ -527,6 +684,9 @@ window.onload = () => {
       execute();
     } else execute();
   };
+
+  // Initial state: toolkit hidden (text mode is default)
+  toolkitPanel.style.display = "none";
 
   // Single execute button listener (mode-aware)
   executeBtn.addEventListener("click", () => {
@@ -538,6 +698,7 @@ window.onload = () => {
   modeSelect.addEventListener("change", () => {
     reset();
     if (modeSelect.value === "blocks") switchToBlocks();
+    else if (modeSelect.value === "drag") switchToDragToText();
     else switchToText();
   });
 
