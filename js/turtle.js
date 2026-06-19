@@ -44,6 +44,8 @@ export class Turtle {
     // Processes one action per tick (or batches when the queue is very long).
     // The idle poll (200 ms) keeps the loop alive between bursts.
     let queueActive = false;
+    let activeLoops = 0;
+    let nextDelay = 0;
     const q = (() => {
       const funs = [];
       let at = 0;
@@ -53,11 +55,16 @@ export class Turtle {
         if (len > 0) {
           queueActive = true;
           if (len > 500) {
-            for (let i = 0; i < len / 250; i++) funs[at++]();
+            for (let i = 0; i < len / 250; i++) {
+              funs[at++]();
+              if (nextDelay > 0) break;
+            }
           } else {
             funs[at++]();
           }
-          setTimeout(run, 0);
+          const delay = nextDelay;
+          nextDelay = 0;
+          setTimeout(run, delay);
         } else {
           queueActive = false;
           if (funs.length > 0) {
@@ -150,6 +157,19 @@ export class Turtle {
       return this;
     };
 
+    this.seek = (obj, step = 10) => {
+      if (!obj) return this;
+      this.face(obj.cx, obj.cy);
+      this.forward(step);
+      return this;
+    };
+
+    this.goTo = (obj) => {
+      if (!obj) return this;
+      this.xy(obj.cx, obj.cy);
+      return this;
+    };
+
     // ── Shapes ───────────────────────────────────────────────────────────────
     this.disc = (radius) => {
       const { x, y } = pos;
@@ -169,6 +189,39 @@ export class Turtle {
         ctx.strokeStyle = foreground;
         ctx.arc(x, y, radius, 0, 2 * Math.PI, true);
         ctx.stroke();
+      });
+      return this;
+    };
+
+    this.arc = (radius, degrees) => {
+      const d = degrees * (Math.PI / 180);
+      let cx, cy, startA, endA, ccw;
+      if (degrees >= 0) {
+        cx = pos.x - Math.cos(heading) * radius;
+        cy = pos.y + Math.sin(heading) * radius;
+        startA = -heading;
+        endA = -heading - d;
+        ccw = true;
+      } else {
+        cx = pos.x + Math.cos(heading) * radius;
+        cy = pos.y - Math.sin(heading) * radius;
+        startA = Math.PI - heading;
+        endA = Math.PI - heading - d;
+        ccw = false;
+      }
+      pos.x = cx + Math.cos(endA) * radius;
+      pos.y = cy + Math.sin(endA) * radius;
+      heading += d;
+      const arcArgs = { cx, cy, r: radius, startA, endA, ccw, x: pos.x, y: pos.y, pd: penDown, width, fg: foreground };
+      q(() => {
+        if (arcArgs.pd) {
+          ctx.beginPath();
+          ctx.strokeStyle = arcArgs.fg;
+          ctx.lineWidth = Number(arcArgs.width);
+          ctx.arc(arcArgs.cx, arcArgs.cy, arcArgs.r, arcArgs.startA, arcArgs.endA, arcArgs.ccw);
+          ctx.stroke();
+        }
+        go({ x: arcArgs.x, y: arcArgs.y, pd: false, width: arcArgs.width, fg: arcArgs.fg });
       });
       return this;
     };
@@ -266,7 +319,7 @@ export class Turtle {
 
     (window.__ar_turtles ??= []).push(this);
 
-    Object.defineProperty(this, "isIdle", { get: () => !queueActive });
+    Object.defineProperty(this, "isIdle", { get: () => !queueActive && activeLoops === 0 });
 
     this.stop = () => {
       stopped = true;
@@ -283,14 +336,46 @@ export class Turtle {
       return this;
     };
 
-    // NOTE: forever() is a synchronous infinite loop — it will freeze the
-    // browser unless fn returns false at some point to break out.
     this.forever = (fn) => {
+      activeLoops++;
       let i = 0;
-      while (true) {
+      const tick = () => {
+        if (stopped) { activeLoops--; return; }
         const result = fn.call(this, i++);
-        if (!result && result !== undefined) break;
-      }
+        if (!result && result !== undefined) { activeLoops--; return; }
+        setTimeout(tick, 0);
+      };
+      tick();
+      return this;
+    };
+
+    this.wait = (seconds) => {
+      q(() => { nextDelay = Math.round(seconds * 1000); });
+      return this;
+    };
+
+    // ── Edge / Collision events ───────────────────────────────────────────────
+    this.onEdge = (cb) => {
+      let wasOutside = false;
+      this.on("move", (t) => {
+        const outside = t.x < 0 || t.x > canvasWidth || t.y < 0 || t.y > canvasHeight;
+        if (outside && !wasOutside) cb.call(this);
+        wasOutside = outside;
+      });
+      return this;
+    };
+
+    this.onCollide = (other, dist = 20, cb) => {
+      let wasColliding = false;
+      const check = () => {
+        const dx = this.get.x() - other.get.x();
+        const dy = this.get.y() - other.get.y();
+        const colliding = Math.hypot(dx, dy) <= dist;
+        if (colliding && !wasColliding) cb.call(this);
+        wasColliding = colliding;
+      };
+      this.on("move", check);
+      other.on("move", check);
       return this;
     };
 

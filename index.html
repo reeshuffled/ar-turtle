@@ -99,6 +99,23 @@
         opacity: 0.7;
         margin-left: 4px;
         flex-shrink: 0;
+        cursor: help;
+      }
+      #toolkit-tooltip {
+        position: fixed;
+        background: #222;
+        color: #fff;
+        padding: 5px 9px;
+        border-radius: 5px;
+        font-size: 11px;
+        font-family: Arial, sans-serif;
+        max-width: 210px;
+        white-space: normal;
+        line-height: 1.4;
+        pointer-events: none;
+        z-index: 9999;
+        display: none;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.35);
       }
       #editor-wrap {
         flex: 1;
@@ -260,6 +277,12 @@
         </li>
         <li id="cameraToggle" style="display: none">Turn Camera On</li>
         <li id="fullscreenBtn" style="float: right; margin-right: 4px">Fullscreen</li>
+        <li
+          id="clearCanvasBtn"
+          style="float: right; margin-right: 4px; display: none"
+        >
+          Clear Canvas
+        </li>
         <li
           id="execute"
           style="float: right; margin-right: 4px; background-color: green; color: white"

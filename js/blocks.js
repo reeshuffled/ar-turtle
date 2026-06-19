@@ -13,6 +13,7 @@ const PEN_COLOR = 43;
 const DRAW_COLOR = 260;
 const CTRL_COLOR = 120;
 const TURTLE_COLOR = 20;
+const EVENT_COLOR = 340;
 
 function turtleField() {
   return new Blockly.FieldVariable("turtle", null, ["Turtle"], "Turtle");
@@ -26,6 +27,7 @@ Blockly.Blocks["turtle_create"] = {
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour(TURTLE_COLOR);
+    this.setTooltip("Create a new turtle on the canvas");
   },
 };
 
@@ -38,6 +40,7 @@ Blockly.Blocks["turtle_forward"] = {
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour(MOVE_COLOR);
+    this.setTooltip("Move forward by the given number of pixels");
   },
 };
 
@@ -50,6 +53,7 @@ Blockly.Blocks["turtle_backward"] = {
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour(MOVE_COLOR);
+    this.setTooltip("Move backward by the given number of pixels");
   },
 };
 
@@ -62,6 +66,7 @@ Blockly.Blocks["turtle_right"] = {
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour(TURN_COLOR);
+    this.setTooltip("Turn right by the given degrees");
   },
 };
 
@@ -74,6 +79,7 @@ Blockly.Blocks["turtle_left"] = {
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour(TURN_COLOR);
+    this.setTooltip("Turn left by the given degrees");
   },
 };
 
@@ -85,6 +91,7 @@ Blockly.Blocks["turtle_pen_up"] = {
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour(PEN_COLOR);
+    this.setTooltip("Lift the pen — turtle moves without drawing");
   },
 };
 
@@ -96,18 +103,20 @@ Blockly.Blocks["turtle_pen_down"] = {
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour(PEN_COLOR);
+    this.setTooltip("Lower the pen — turtle draws lines while moving");
   },
 };
 
 Blockly.Blocks["turtle_color"] = {
   init() {
-    this.appendDummyInput()
+    this.appendValueInput("COLOR")
+      .setCheck(null)
       .appendField(turtleField(), "TURTLE")
-      .appendField("color")
-      .appendField(new FieldColour("#ff0000"), "COLOR");
+      .appendField("color");
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour(PEN_COLOR);
+    this.setTooltip("Set the pen color");
   },
 };
 
@@ -120,6 +129,7 @@ Blockly.Blocks["turtle_thickness"] = {
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour(PEN_COLOR);
+    this.setTooltip("Set the pen stroke width in pixels");
   },
 };
 
@@ -132,6 +142,7 @@ Blockly.Blocks["turtle_disc"] = {
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour(DRAW_COLOR);
+    this.setTooltip("Draw a filled circle at the turtle's current position");
   },
 };
 
@@ -144,6 +155,7 @@ Blockly.Blocks["turtle_circle"] = {
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour(DRAW_COLOR);
+    this.setTooltip("Draw a circle outline at the turtle's current position");
   },
 };
 
@@ -155,6 +167,7 @@ Blockly.Blocks["turtle_home"] = {
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour(MOVE_COLOR);
+    this.setTooltip("Return to center and reset heading to 0°");
   },
 };
 
@@ -166,6 +179,7 @@ Blockly.Blocks["turtle_clear"] = {
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour(MOVE_COLOR);
+    this.setTooltip("Fill background, go home, and put pen down");
   },
 };
 
@@ -177,6 +191,30 @@ Blockly.Blocks["turtle_clean"] = {
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour(MOVE_COLOR);
+    this.setTooltip("Fill the background with color (keeps current position)");
+  },
+};
+
+Blockly.Blocks["colour_picker"] = {
+  init() {
+    this.appendDummyInput().appendField(new FieldColour("#ff0000"), "COLOUR");
+    this.setOutput(true, "String");
+    this.setColour(PEN_COLOR);
+    this.setTooltip("Pick a color");
+  },
+};
+
+javascriptGenerator.forBlock["colour_picker"] = (block) => {
+  const c = block.getFieldValue("COLOUR") || "#ff0000";
+  return [JSON.stringify(c), Order.ATOMIC];
+};
+
+Blockly.Blocks["color_random"] = {
+  init() {
+    this.appendDummyInput().appendField("random color");
+    this.setOutput(true, "String");
+    this.setColour(PEN_COLOR);
+    this.setTooltip("A random color, different each time");
   },
 };
 
@@ -186,6 +224,7 @@ Blockly.Blocks["console_log"] = {
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour(60);
+    this.setTooltip("Print a value to the console");
   },
 };
 
@@ -197,6 +236,7 @@ Blockly.Blocks["timer_set_interval"] = {
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour(CTRL_COLOR);
+    this.setTooltip("Run the contained blocks every N milliseconds");
   },
 };
 
@@ -208,6 +248,7 @@ Blockly.Blocks["timer_set_timeout"] = {
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour(CTRL_COLOR);
+    this.setTooltip("Run the contained blocks once after N milliseconds");
   },
 };
 
@@ -222,6 +263,142 @@ Blockly.Blocks["turtle_repeat"] = {
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour(CTRL_COLOR);
+    this.setTooltip("Repeat the contained blocks N times (return false to break early)");
+  },
+};
+
+Blockly.Blocks["turtle_wait"] = {
+  init() {
+    this.appendValueInput("SECONDS")
+      .setCheck("Number")
+      .appendField(turtleField(), "TURTLE")
+      .appendField("wait");
+    this.appendDummyInput().appendField("seconds");
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.setColour(CTRL_COLOR);
+    this.setTooltip("Pause the turtle queue for N seconds before the next command");
+  },
+};
+
+Blockly.Blocks["event_on_start"] = {
+  init() {
+    this.hat = "cap";
+    this.appendDummyInput().appendField("when program starts");
+    this.setNextStatement(true);
+    this.setColour(EVENT_COLOR);
+    this.setTooltip("Run attached blocks once when the program starts");
+  },
+};
+
+Blockly.Blocks["event_on_key"] = {
+  init() {
+    this.hat = "cap";
+    this.appendDummyInput()
+      .appendField("when")
+      .appendField(
+        new Blockly.FieldDropdown([
+          ["↑ up", "ArrowUp"],
+          ["↓ down", "ArrowDown"],
+          ["← left", "ArrowLeft"],
+          ["→ right", "ArrowRight"],
+          ["space", " "],
+          ["W", "w"],
+          ["A", "a"],
+          ["S", "s"],
+          ["D", "d"],
+          ["0", "0"],
+          ["1", "1"],
+          ["2", "2"],
+          ["3", "3"],
+          ["4", "4"],
+          ["5", "5"],
+          ["6", "6"],
+          ["7", "7"],
+          ["8", "8"],
+          ["9", "9"],
+          ["any key", "__any__"],
+        ]),
+        "KEY"
+      )
+      .appendField("pressed");
+    this.setNextStatement(true);
+    this.setColour(EVENT_COLOR);
+    this.setTooltip("Run attached blocks each time the selected key is pressed");
+  },
+};
+
+Blockly.Blocks["event_on_edge"] = {
+  init() {
+    this.hat = "cap";
+    this.appendDummyInput()
+      .appendField("when")
+      .appendField(turtleField(), "TURTLE")
+      .appendField("hits edge");
+    this.setNextStatement(true);
+    this.setColour(EVENT_COLOR);
+    this.setTooltip("Run attached blocks once each time the turtle crosses the canvas edge");
+  },
+};
+
+Blockly.Blocks["event_on_gesture"] = {
+  init() {
+    this.hat = "cap";
+    this.appendDummyInput()
+      .appendField("when gesture")
+      .appendField(
+        new Blockly.FieldDropdown([
+          ["👍 thumbs up", "Thumb_Up"],
+          ["👎 thumbs down", "Thumb_Down"],
+          ["✋ open palm", "Open_Palm"],
+          ["✊ fist", "Closed_Fist"],
+          ["☝️ pointing up", "Pointing_Up"],
+          ["✌️ peace sign", "Victory"],
+          ["🤟 I love you", "ILoveYou"],
+        ]),
+        "GESTURE"
+      )
+      .appendField("detected");
+    this.setNextStatement(true);
+    this.setColour(EVENT_COLOR);
+    this.setTooltip("Run attached blocks when the selected hand gesture is detected");
+  },
+};
+
+Blockly.Blocks["event_on_expression"] = {
+  init() {
+    this.hat = "cap";
+    this.appendDummyInput()
+      .appendField("when expression")
+      .appendField(
+        new Blockly.FieldDropdown([
+          ["😊 smile", "smile"],
+          ["😮 surprise", "surprise"],
+          ["☹️ frown", "frown"],
+          ["😮 mouth open", "mouth_open"],
+        ]),
+        "EXPRESSION"
+      )
+      .appendField("detected");
+    this.setNextStatement(true);
+    this.setColour(EVENT_COLOR);
+    this.setTooltip("Run attached blocks when the selected facial expression is detected");
+  },
+};
+
+Blockly.Blocks["event_on_collide"] = {
+  init() {
+    this.hat = "cap";
+    this.appendDummyInput()
+      .appendField("when")
+      .appendField(turtleField(), "TURTLE")
+      .appendField("collides with")
+      .appendField(turtleField(), "OTHER");
+    this.appendValueInput("DIST").setCheck("Number").appendField("within");
+    this.appendDummyInput().appendField("px");
+    this.setNextStatement(true);
+    this.setColour(EVENT_COLOR);
+    this.setTooltip("Run attached blocks when two turtles come within the given distance of each other");
   },
 };
 
@@ -263,8 +440,8 @@ javascriptGenerator.forBlock["turtle_clear"] = (block, gen) => `${turtleName(blo
 javascriptGenerator.forBlock["turtle_clean"] = (block, gen) => `${turtleName(block, gen)}.clean();\n`;
 
 javascriptGenerator.forBlock["turtle_color"] = (block, gen) => {
-  const c = block.getFieldValue("COLOR") || "#000000";
-  return `${turtleName(block, gen)}.color('${c}');\n`;
+  const c = gen.valueToCode(block, "COLOR", Order.NONE) || "'#000000'";
+  return `${turtleName(block, gen)}.color(${c});\n`;
 };
 
 javascriptGenerator.forBlock["turtle_thickness"] = (block, gen) => {
@@ -288,6 +465,11 @@ javascriptGenerator.forBlock["turtle_repeat"] = (block, gen) => {
   return `${turtleName(block, gen)}.repeat(${count}, () => {\n${branch}});\n`;
 };
 
+javascriptGenerator.forBlock["turtle_wait"] = (block, gen) => {
+  const secs = gen.valueToCode(block, "SECONDS", Order.NONE) || "1";
+  return `${turtleName(block, gen)}.wait(${secs});\n`;
+};
+
 javascriptGenerator.forBlock["timer_set_interval"] = (block, gen) => {
   const delay = gen.valueToCode(block, "DELAY", Order.NONE) || "1000";
   const branch = gen.statementToCode(block, "DO");
@@ -300,9 +482,63 @@ javascriptGenerator.forBlock["timer_set_timeout"] = (block, gen) => {
   return `setTimeout(() => {\n${branch}}, ${delay});\n`;
 };
 
+javascriptGenerator.forBlock["color_random"] = () =>
+  [`\`hsl(\${Math.floor(Math.random()*360)},\${50+Math.floor(Math.random()*50)}%,\${40+Math.floor(Math.random()*30)}%)\``, Order.ATOMIC];
+
 javascriptGenerator.forBlock["console_log"] = (block, gen) => {
   const val = gen.valueToCode(block, "VALUE", Order.NONE) || '""';
   return `console.log(${val});\n`;
+};
+
+// Event hat blocks use next-connections (blocks chain below). We manually walk
+// the chain in each generator, then override scrub_ to prevent double-generation.
+const _scrub = javascriptGenerator.scrub_.bind(javascriptGenerator);
+javascriptGenerator.scrub_ = function (block, code, opt_thisOnly) {
+  if (block.type.startsWith("event_")) return code;
+  return _scrub(block, code, opt_thisOnly);
+};
+
+const genNextChain = (gen, block) => {
+  const next = block.nextConnection?.targetBlock();
+  return next ? gen.blockToCode(next) : "";
+};
+
+javascriptGenerator.forBlock["event_on_start"] = (block, gen) => {
+  return genNextChain(gen, block);
+};
+
+javascriptGenerator.forBlock["event_on_key"] = (block, gen) => {
+  const key = block.getFieldValue("KEY");
+  const inner = genNextChain(gen, block);
+  if (key === "__any__") {
+    return `window.__ar_canvasEl.addEventListener('keydown', function(__e) {\n${inner}});\n`;
+  }
+  return `window.__ar_canvasEl.addEventListener('keydown', function(__e) {\nif (__e.key === ${JSON.stringify(key)}) {\n${inner}}\n});\n`;
+};
+
+javascriptGenerator.forBlock["event_on_gesture"] = (block, gen) => {
+  const gesture = block.getFieldValue("GESTURE");
+  const inner = genNextChain(gen, block);
+  return `(function() {\n  var _prev = false;\n  setInterval(function() {\n    var _curr = vision.gesture() === ${JSON.stringify(gesture)};\n    if (_curr && !_prev) {\n${inner}    }\n    _prev = _curr;\n  }, 100);\n})();\n`;
+};
+
+javascriptGenerator.forBlock["event_on_expression"] = (block, gen) => {
+  const expr = block.getFieldValue("EXPRESSION");
+  const inner = genNextChain(gen, block);
+  return `(function() {\n  var _prev = false;\n  setInterval(function() {\n    var _curr = vision.expression() === ${JSON.stringify(expr)};\n    if (_curr && !_prev) {\n${inner}    }\n    _prev = _curr;\n  }, 100);\n})();\n`;
+};
+
+javascriptGenerator.forBlock["event_on_edge"] = (block, gen) => {
+  const inner = genNextChain(gen, block);
+  return `${turtleName(block, gen)}.onEdge(function() {\n${inner}});\n`;
+};
+
+javascriptGenerator.forBlock["event_on_collide"] = (block, gen) => {
+  const t1 = gen.getVariableName(block.getFieldValue("TURTLE"));
+  const t2 = gen.getVariableName(block.getFieldValue("OTHER"));
+  const dist = gen.valueToCode(block, "DIST", Order.NONE) || "20";
+  const inner = genNextChain(gen, block);
+  return `${t1}.onCollide(${t2}, ${dist}, function() {\n${inner}});\n`;
 };
 
 // ── Toolbox definition ────────────────────────────────────────────────────
@@ -310,6 +546,23 @@ javascriptGenerator.forBlock["console_log"] = (block, gen) => {
 export const TOOLBOX = {
   kind: "categoryToolbox",
   contents: [
+    {
+      kind: "category",
+      name: "Events",
+      colour: String(EVENT_COLOR),
+      contents: [
+        { kind: "block", type: "event_on_start" },
+        { kind: "block", type: "event_on_key" },
+        { kind: "block", type: "event_on_edge" },
+        {
+          kind: "block",
+          type: "event_on_collide",
+          inputs: { DIST: { shadow: { type: "math_number", fields: { NUM: 20 } } } },
+        },
+        { kind: "block", type: "event_on_gesture" },
+        { kind: "block", type: "event_on_expression" },
+      ],
+    },
     {
       kind: "category",
       name: "Turtle",
@@ -354,7 +607,12 @@ export const TOOLBOX = {
       contents: [
         { kind: "block", type: "turtle_pen_up" },
         { kind: "block", type: "turtle_pen_down" },
-        { kind: "block", type: "turtle_color" },
+        {
+          kind: "block",
+          type: "turtle_color",
+          inputs: { COLOR: { shadow: { type: "colour_picker", fields: { COLOUR: "#ff0000" } } } },
+        },
+        { kind: "block", type: "color_random" },
         { kind: "block", type: "turtle_thickness" },
       ],
     },
@@ -384,6 +642,11 @@ export const TOOLBOX = {
           kind: "block",
           type: "turtle_repeat",
           inputs: { COUNT: { shadow: { type: "math_number", fields: { NUM: 4 } } } },
+        },
+        {
+          kind: "block",
+          type: "turtle_wait",
+          inputs: { SECONDS: { shadow: { type: "math_number", fields: { NUM: 1 } } } },
         },
         {
           kind: "block",

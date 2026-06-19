@@ -36,6 +36,98 @@
         background: #fff;
       }
 
+      /* Drag-to-text toolkit panel */
+      #toolkit-panel {
+        width: 160px;
+        min-width: 160px;
+        background: #f0f2f5;
+        border-right: 1px solid #ccc;
+        overflow-y: auto;
+        overflow-x: hidden;
+        font-family: Arial, sans-serif;
+        flex-shrink: 0;
+      }
+      #toolkit-header {
+        padding: 7px 10px 6px;
+        font-size: 11px;
+        font-weight: bold;
+        letter-spacing: 1px;
+        color: #333;
+        background: #fff;
+        border-bottom: 2px solid #1565c0;
+        text-transform: uppercase;
+      }
+      .toolkit-category {
+        padding: 8px 8px 3px;
+        font-size: 10px;
+        font-weight: bold;
+        letter-spacing: 0.8px;
+        color: #666;
+        text-transform: uppercase;
+      }
+      .toolkit-btn {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: calc(100% - 16px);
+        margin: 2px 8px;
+        padding: 5px 7px;
+        background: #1565c0;
+        color: #fff;
+        border: none;
+        border-radius: 3px;
+        cursor: grab;
+        font-size: 12px;
+        font-family: Arial, sans-serif;
+        user-select: none;
+        box-sizing: border-box;
+      }
+      .toolkit-btn:hover {
+        background: #1976d2;
+      }
+      .toolkit-btn:active {
+        cursor: grabbing;
+        background: #0d47a1;
+      }
+      .toolkit-btn.dragging {
+        opacity: 0.5;
+      }
+      .toolkit-info {
+        font-size: 10px;
+        opacity: 0.7;
+        margin-left: 4px;
+        flex-shrink: 0;
+        cursor: help;
+      }
+      #toolkit-tooltip {
+        position: fixed;
+        background: #222;
+        color: #fff;
+        padding: 5px 9px;
+        border-radius: 5px;
+        font-size: 11px;
+        font-family: Arial, sans-serif;
+        max-width: 210px;
+        white-space: normal;
+        line-height: 1.4;
+        pointer-events: none;
+        z-index: 9999;
+        display: none;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+      }
+      #editor-wrap {
+        flex: 1;
+        min-width: 0;
+        height: 100%;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+      }
+      #editor-wrap #editor {
+        flex: 1;
+        min-height: 0;
+      }
+
       /* Blockly container — fills left panel exactly like CodeMirror does */
       #blockly-area {
         width: 100%;
@@ -107,6 +199,8 @@
         white-space: nowrap;
         background: #838383;
         color: #fff;
+        display: flex;
+        flex-direction: row;
       }
       .splitter {
         flex: 0 0 auto;
@@ -160,7 +254,7 @@
         color: red;
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-ChQWiw4i.js"></script>
+    <script type="module" crossorigin src="/assets/index-CZ8z167A.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-CpIhX3bR.css">
   </head>
 
@@ -173,6 +267,7 @@
         <li style="border: none; padding: 0">
           <select id="modeSelect">
             <option value="text">Text</option>
+            <option value="drag">Drag to Text</option>
             <option value="blocks">Blocks</option>
           </select>
         </li>
@@ -182,6 +277,12 @@
         </li>
         <li id="cameraToggle" style="display: none">Turn Camera On</li>
         <li id="fullscreenBtn" style="float: right; margin-right: 4px">Fullscreen</li>
+        <li
+          id="clearCanvasBtn"
+          style="float: right; margin-right: 4px; display: none"
+        >
+          Clear Canvas
+        </li>
         <li
           id="execute"
           style="float: right; margin-right: 4px; background-color: green; color: white"
@@ -194,9 +295,15 @@
     <div class="panel-container">
       <div class="panel-container">
         <div class="panel-left" style="width: 50%">
-          <div id="editor"></div>
-          <div id="blockly-area">
-            <div id="blockly-div"></div>
+          <div id="toolkit-panel">
+            <div id="toolkit-header">Toolkit</div>
+            <div id="toolkit-body"></div>
+          </div>
+          <div id="editor-wrap">
+            <div id="editor"></div>
+            <div id="blockly-area">
+              <div id="blockly-div"></div>
+            </div>
           </div>
         </div>
 

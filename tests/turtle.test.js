@@ -36,7 +36,9 @@ describe('Turtle', () => {
     vi.useFakeTimers();
     canvas = createCanvas(600, 600);
     turtle = new Turtle(canvas);
-    flushQueue();            // drain the init queue (clean + home + pd)
+    // Advance far enough that all init queue items (clean/home/pd, each on
+    // a 0ms follow-up timer) are fully processed, not just the first 200ms tick.
+    vi.advanceTimersByTime(500);
     vi.clearAllMocks();      // reset call counts so tests start clean
   });
 
@@ -61,8 +63,8 @@ describe('Turtle', () => {
       expect(turtle.get.pu()).toBe(false);
     });
 
-    test('default drawing color is white', () => {
-      expect(turtle.get.color()).toBe('#fff');
+    test('default drawing color is black', () => {
+      expect(turtle.get.color()).toBe('#000');
     });
 
     test('default line thickness is "1"', () => {
@@ -458,6 +460,255 @@ describe('Turtle', () => {
       turtle.stop();
       vi.advanceTimersByTime(2000);
       expect(handler).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── wait() ───────────────────────────────────────────────────────────────────
+
+  describe('wait()', () => {
+    test('wait(1) delays next queued command by 1 second', () => {
+      turtle.wait(1).forward(50);
+      vi.advanceTimersByTime(200); // idle timer fires, processes wait item only
+      expect(canvas._ctx.stroke).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1000); // 1s wait elapses, processes forward
+      expect(canvas._ctx.stroke).toHaveBeenCalled();
+    });
+
+    test('wait(0) does not delay the next command', () => {
+      turtle.wait(0).forward(50);
+      vi.advanceTimersByTime(200);
+      expect(canvas._ctx.stroke).toHaveBeenCalled();
+    });
+
+    test('wait(1) is chainable', () => {
+      expect(turtle.wait(1)).toBe(turtle);
+    });
+  });
+
+  // ── pu / pd events ───────────────────────────────────────────────────────────
+
+  describe('pu / pd events', () => {
+    test('pu event fires after pu()', () => {
+      const handler = vi.fn();
+      turtle.on('pu', handler);
+      turtle.pu();
+      flushQueue();
+      expect(handler).toHaveBeenCalledTimes(1);
+    });
+
+    test('pd event fires after pd()', () => {
+      const handler = vi.fn();
+      turtle.on('pd', handler);
+      turtle.pd();
+      flushQueue();
+      expect(handler).toHaveBeenCalledTimes(1);
+    });
+
+    test('pu then pd fires both events in order', () => {
+      const log = [];
+      turtle.on('pu', () => log.push('pu'));
+      turtle.on('pd', () => log.push('pd'));
+      turtle.pu().pd();
+      flushQueue();
+      expect(log).toEqual(['pu', 'pd']);
+    });
+  });
+
+  // ── onEdge ───────────────────────────────────────────────────────────────────
+
+  describe('onEdge()', () => {
+    test('fires when turtle exits canvas boundary', () => {
+      const cb = vi.fn();
+      turtle.onEdge(cb);
+      turtle.xy(400, 0); // canvas-space x = 700.5 > 600
+      flushQueue();
+      expect(cb).toHaveBeenCalledTimes(1);
+    });
+
+    test('fires only once per crossing, not on every OOB move', () => {
+      const cb = vi.fn();
+      turtle.onEdge(cb);
+      turtle.xy(400, 0).xy(450, 0); // both OOB
+      flushQueue();
+      expect(cb).toHaveBeenCalledTimes(1);
+    });
+
+    test('fires again after re-entry and second exit', () => {
+      const cb = vi.fn();
+      turtle.onEdge(cb);
+      turtle.xy(400, 0); // exit
+      flushQueue();
+      turtle.xy(0, 0);   // re-enter: canvas-space (300.5, 300.5) — inside
+      flushQueue();
+      turtle.xy(400, 0); // exit again
+      flushQueue();
+      expect(cb).toHaveBeenCalledTimes(2);
+    });
+
+    test('does not fire when turtle stays within bounds', () => {
+      const cb = vi.fn();
+      turtle.onEdge(cb);
+      turtle.xy(100, 100).xy(-100, -100); // both inside 600×600 canvas
+      flushQueue();
+      expect(cb).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── onCollide ────────────────────────────────────────────────────────────────
+
+  describe('onCollide()', () => {
+    test('fires when turtles are within dist', () => {
+      const canvas2 = createCanvas();
+      const turtle2 = new Turtle(canvas2);
+      flushQueue();
+      vi.clearAllMocks();
+
+      const cb = vi.fn();
+      turtle.onCollide(turtle2, 50, cb);
+      turtle.xy(10, 0); // turtle at (10, 0), turtle2 at (0, 0) → dist=10 ≤ 50
+      flushQueue();
+      expect(cb).toHaveBeenCalledTimes(1);
+    });
+
+    test('does not fire when turtles are beyond dist', () => {
+      const canvas2 = createCanvas();
+      const turtle2 = new Turtle(canvas2);
+      flushQueue();
+      vi.clearAllMocks();
+
+      const cb = vi.fn();
+      turtle.onCollide(turtle2, 50, cb);
+      turtle.xy(200, 0); // dist=200 > 50
+      flushQueue();
+      expect(cb).not.toHaveBeenCalled();
+    });
+
+    test('fires only once per collision entry (not on every close move)', () => {
+      const canvas2 = createCanvas();
+      const turtle2 = new Turtle(canvas2);
+      flushQueue();
+      vi.clearAllMocks();
+
+      const cb = vi.fn();
+      turtle.onCollide(turtle2, 50, cb);
+      turtle.xy(10, 0).xy(20, 0); // both within 50px of (0,0)
+      flushQueue();
+      expect(cb).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ── forever ──────────────────────────────────────────────────────────────────
+
+  describe('forever()', () => {
+    test('loops until fn returns false', () => {
+      let count = 0;
+      turtle.forever(() => {
+        count++;
+        return count < 3;
+      });
+      // tick() fires once synchronously (count=1), then 2 more via setTimeout(0).
+      // 1ms advances needed — advanceTimersByTime(0) does not fire timers at current time.
+      vi.advanceTimersByTime(1);
+      vi.advanceTimersByTime(1);
+      expect(count).toBe(3);
+    });
+
+    test('passes incrementing index to fn', () => {
+      const indices = [];
+      turtle.forever((i) => {
+        indices.push(i);
+        return i < 2;
+      });
+      vi.advanceTimersByTime(1);
+      vi.advanceTimersByTime(1);
+      expect(indices).toEqual([0, 1, 2]);
+    });
+
+    test('is chainable', () => {
+      expect(turtle.forever(() => false)).toBe(turtle);
+    });
+  });
+
+  // ── butt() ───────────────────────────────────────────────────────────────────
+
+  describe('butt()', () => {
+    test('butt(100, 0) points away from east — heading west (-90°)', () => {
+      turtle.butt(100, 0);
+      expect(turtle.get.heading()).toBeCloseTo(-90, 0);
+    });
+
+    test('butt(0, 100) points away from north — heading south (±180°)', () => {
+      turtle.butt(0, 100);
+      // atan2(dx=0, dy=100)+π = π; get.heading() = -π*(180/π) = -180
+      // -180 and 180 are the same compass direction
+      expect(Math.abs(turtle.get.heading())).toBeCloseTo(180, 0);
+    });
+
+    test('butt is opposite of face for same coordinate', () => {
+      turtle.face(100, 0);
+      const faceHeading = turtle.get.heading();
+      turtle.butt(100, 0);
+      const buttHeading = turtle.get.heading();
+      // butt heading = face heading ± 180
+      expect(Math.abs(Math.abs(faceHeading - buttHeading) - 180)).toBeLessThan(1);
+    });
+
+    test('is chainable', () => {
+      expect(turtle.butt(0, 0)).toBe(turtle);
+    });
+  });
+
+  // ── isIdle ───────────────────────────────────────────────────────────────────
+
+  describe('isIdle', () => {
+    test('true after init queue drains', () => {
+      expect(turtle.isIdle).toBe(true);
+    });
+
+    test('false immediately after pushing a command', () => {
+      turtle.forward(10);
+      expect(turtle.isIdle).toBe(false);
+    });
+
+    test('true again after queue drains', () => {
+      turtle.forward(10);
+      flushQueue();
+      expect(turtle.isIdle).toBe(true);
+    });
+
+    test('false while forever loop is active', () => {
+      let stop = false;
+      turtle.forever(() => !stop);
+      expect(turtle.isIdle).toBe(false);
+      stop = true;
+      vi.advanceTimersByTime(1); // tick fires → fn returns false → activeLoops--
+      expect(turtle.isIdle).toBe(true);
+    });
+  });
+
+  // ── reset / init ─────────────────────────────────────────────────────────────
+
+  describe('reset() / init()', () => {
+    test('reset() sets background to transparent', () => {
+      turtle.clean('blue');
+      turtle.reset();
+      expect(turtle.get.background()).toBe('transparent');
+    });
+
+    test('reset() restores default foreground color', () => {
+      turtle.color('hotpink');
+      turtle.reset();
+      expect(turtle.get.color()).toBe('#000');
+    });
+
+    test('reset() restores default thickness', () => {
+      turtle.thickness(10);
+      turtle.reset();
+      expect(turtle.get.thickness()).toBe('1');
+    });
+
+    test('reset() returns turtle (chainable)', () => {
+      expect(turtle.reset()).toBe(turtle);
     });
   });
 });

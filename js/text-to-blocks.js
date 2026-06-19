@@ -43,6 +43,16 @@ export function textToBlocks(code, workspace) {
     topBlocks.push(...blocks);
   }
 
+  // If no event hat blocks exist, prepend event_on_start.
+  const eventTypes = ["event_on_start", "event_on_key", "event_on_edge", "event_on_collide"];
+  const hasEventBlock = eventTypes.some((t) => workspace.getBlocksByType(t, false).length > 0);
+  if (!hasEventBlock) {
+    const hat = workspace.newBlock("event_on_start");
+    hat.initSvg();
+    hat.render();
+    topBlocks.unshift(hat);
+  }
+
   // Chain all top-level blocks together and position the first one.
   topBlocks[0].moveBy(x, 40);
   for (let i = 0; i < topBlocks.length - 1; i++) {
