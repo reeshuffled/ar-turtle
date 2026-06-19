@@ -154,8 +154,8 @@
         background: #000;
       }
       #fsContainer:fullscreen #canvasWrapper {
-        width: 100vmin !important;
-        height: 100vmin !important;
+        width: min(100vw, calc(100vh * 16 / 9)) !important;
+        height: min(100vh, calc(100vw * 9 / 16)) !important;
       }
 
       #canvasWrapper {
@@ -254,7 +254,7 @@
         color: red;
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-CZ8z167A.js"></script>
+    <script type="module" crossorigin src="/assets/index-BxsgUd0o.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-CpIhX3bR.css">
   </head>
 
@@ -278,16 +278,22 @@
         <li id="cameraToggle" style="display: none">Turn Camera On</li>
         <li id="fullscreenBtn" style="float: right; margin-right: 4px">Fullscreen</li>
         <li
-          id="clearCanvasBtn"
-          style="float: right; margin-right: 4px; display: none"
-        >
-          Clear Canvas
-        </li>
-        <li
           id="execute"
           style="float: right; margin-right: 4px; background-color: green; color: white"
         >
           Execute Program
+        </li>
+        <li
+          id="stopBtn"
+          style="float: right; margin-right: 4px; background-color: #b00; color: white; display: none"
+        >
+          Stop
+        </li>
+        <li
+          id="clearCanvasBtn"
+          style="float: right; margin-right: 4px; display: none"
+        >
+          Clear Canvas
         </li>
       </ul>
     </nav>
@@ -313,8 +319,8 @@
           <!-- Camera and Drawing Canvases -->
           <div id="fsContainer">
             <div id="canvasWrapper">
-              <canvas id="camera" height="600" width="600"></canvas>
-              <canvas id="turtle" height="600" width="600"></canvas>
+              <canvas id="camera" height="900" width="1600"></canvas>
+              <canvas id="turtle" height="900" width="1600"></canvas>
             </div>
           </div>
           <!-- Console Output -->

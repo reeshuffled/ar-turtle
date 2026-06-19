@@ -17,7 +17,11 @@ export function textToBlocks(code, workspace) {
   let turtleZ = 0;
   for (const node of ast.body) {
     const found = findTurtleVarName(node);
-    if (found) { varName = found.name; turtleZ = found.z; break; }
+    if (found) {
+      varName = found.name;
+      turtleZ = found.z;
+      break;
+    }
   }
   if (!varName) return false;
 
@@ -46,7 +50,14 @@ export function textToBlocks(code, workspace) {
   }
 
   // If no event hat blocks exist, prepend event_on_start.
-  const eventTypes = ["event_on_start", "event_on_key", "event_on_edge", "event_on_collide", "event_on_gesture", "event_on_expression"];
+  const eventTypes = [
+    "event_on_start",
+    "event_on_key",
+    "event_on_edge",
+    "event_on_collide",
+    "event_on_gesture",
+    "event_on_expression",
+  ];
   const hasEventBlock = eventTypes.some((t) => workspace.getBlocksByType(t, false).length > 0);
   if (!hasEventBlock) {
     const hat = workspace.newBlock("event_on_start");
@@ -175,7 +186,8 @@ function makeMethodBlock(method, args, varName, turtleVar, workspace) {
       setTurtleField(block, turtleVar);
       const v = numVal(args[0]);
       if (v !== null) block.setFieldValue(String(v), "DEGREES");
-      block.initSvg(); block.render();
+      block.initSvg();
+      block.render();
       return block;
     }
     case "face":
@@ -349,31 +361,43 @@ function makeXYBlock(type, args, turtleVar, workspace) {
   setTurtleField(block, turtleVar);
   const xVal = numVal(args[0]);
   const yVal = numVal(args[1]);
-  for (const [input, val] of [["X", xVal], ["Y", yVal]]) {
+  for (const [input, val] of [
+    ["X", xVal],
+    ["Y", yVal],
+  ]) {
     if (val !== null) {
       const s = workspace.newBlock("math_number");
       s.setFieldValue(String(val), "NUM");
-      s.setShadow(true); s.initSvg(); s.render();
+      s.setShadow(true);
+      s.initSvg();
+      s.render();
       block.getInput(input)?.connection?.connect(s.outputConnection);
     }
   }
-  block.initSvg(); block.render();
+  block.initSvg();
+  block.render();
   return block;
 }
 
 function makeArcBlock(args, turtleVar, workspace) {
   const block = workspace.newBlock("turtle_arc");
   setTurtleField(block, turtleVar);
-  for (const [input, idx] of [["RADIUS", 0], ["DEGREES", 1]]) {
+  for (const [input, idx] of [
+    ["RADIUS", 0],
+    ["DEGREES", 1],
+  ]) {
     const val = numVal(args[idx]);
     if (val !== null) {
       const s = workspace.newBlock("math_number");
       s.setFieldValue(String(val), "NUM");
-      s.setShadow(true); s.initSvg(); s.render();
+      s.setShadow(true);
+      s.initSvg();
+      s.render();
       block.getInput(input)?.connection?.connect(s.outputConnection);
     }
   }
-  block.initSvg(); block.render();
+  block.initSvg();
+  block.render();
   return block;
 }
 
@@ -384,17 +408,21 @@ function makeSeekBlock(args, turtleVar, workspace) {
   if (stepVal !== null) {
     const s = workspace.newBlock("math_number");
     s.setFieldValue(String(stepVal), "NUM");
-    s.setShadow(true); s.initSvg(); s.render();
+    s.setShadow(true);
+    s.initSvg();
+    s.render();
     block.getInput("STEP")?.connection?.connect(s.outputConnection);
   }
-  block.initSvg(); block.render();
+  block.initSvg();
+  block.render();
   return block;
 }
 
 function makeGotoBlock(args, turtleVar, workspace) {
   const block = workspace.newBlock("turtle_goto");
   setTurtleField(block, turtleVar);
-  block.initSvg(); block.render();
+  block.initSvg();
+  block.render();
   return block;
 }
 
@@ -412,9 +440,10 @@ function makeSideChain(node, varName, turtleVar, workspace) {
   if (method === "onEdge") {
     const hat = workspace.newBlock("event_on_edge");
     setTurtleField(hat, turtleVar);
-    hat.initSvg(); hat.render();
+    hat.initSvg();
+    hat.render();
     const bodyStmts = getFunctionBody(args[0]);
-    const inner = bodyStmts.flatMap(s => stmtToBlocks(s, varName, turtleVar, workspace));
+    const inner = bodyStmts.flatMap((s) => stmtToBlocks(s, varName, turtleVar, workspace));
     return [hat, ...inner];
   }
 
@@ -425,12 +454,15 @@ function makeSideChain(node, varName, turtleVar, workspace) {
     if (distVal !== null) {
       const s = workspace.newBlock("math_number");
       s.setFieldValue(String(distVal), "NUM");
-      s.setShadow(true); s.initSvg(); s.render();
+      s.setShadow(true);
+      s.initSvg();
+      s.render();
       hat.getInput("DIST")?.connection?.connect(s.outputConnection);
     }
-    hat.initSvg(); hat.render();
+    hat.initSvg();
+    hat.render();
     const bodyStmts = getFunctionBody(args[2]);
-    const inner = bodyStmts.flatMap(s => stmtToBlocks(s, varName, turtleVar, workspace));
+    const inner = bodyStmts.flatMap((s) => stmtToBlocks(s, varName, turtleVar, workspace));
     return [hat, ...inner];
   }
 

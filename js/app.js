@@ -5,6 +5,8 @@ import * as Blockly from "blockly";
 import { javascriptGenerator, TOOLBOX } from "./blocks.js";
 import { textToBlocks } from "./text-to-blocks.js";
 import { vision, stopVision, preloadVision } from "./vision.js";
+import { TOOLKIT_CATEGORIES, getTurtleVarNames, turtleHint } from "./completions.js";
+import { initCamera } from "./camera.js";
 
 // Capture native timer/event functions before any user-code patching.
 const _nativeSetInterval = window.setInterval.bind(window);
@@ -44,192 +46,6 @@ window.randUni = (lo, hi) => Math.random() * (hi - lo) + lo;
 // Pre-load models immediately — detection loop still starts lazily on first vision.* call.
 preloadVision();
 
-const TURTLE_COMPLETIONS = [
-  { text: "forward", displayText: "forward(amount) — move forward by amount pixels" },
-  { text: "backward", displayText: "backward(amount) — move backward by amount pixels" },
-  { text: "right", displayText: "right(deg) — turn right by degrees" },
-  { text: "left", displayText: "left(deg) — turn left by degrees" },
-  { text: "xy", displayText: "xy(x, y) — teleport to canvas coordinate" },
-  { text: "x", displayText: "x(x) — move to x, keep y" },
-  { text: "y", displayText: "y(y) — move to y, keep x" },
-  { text: "heading", displayText: "heading(deg) — set absolute heading in degrees" },
-  { text: "face", displayText: "face(x, y) — point toward canvas coordinate" },
-  { text: "butt", displayText: "butt(x, y) — point away from canvas coordinate" },
-  { text: "disc", displayText: "disc(radius) — draw filled circle at current position" },
-  { text: "circle", displayText: "circle(radius) — draw circle outline at current position" },
-  { text: "arc", displayText: "arc(radius, degrees) — sweep arc; positive degrees = left, negative = right" },
-  { text: "pu", displayText: "pu() — pen up: lift pen, stop drawing lines" },
-  { text: "pd", displayText: "pd() — pen down: draw lines while moving" },
-  { text: "color", displayText: "color(c) — set pen color (any CSS color string)" },
-  { text: "thickness", displayText: "thickness(w) — set pen stroke width" },
-  { text: "clean", displayText: "clean(color?) — fill background; optional color arg" },
-  { text: "home", displayText: "home() — return to center and reset heading to 0°" },
-  { text: "clear", displayText: "clear() — clean + home + pen down" },
-  { text: "reset", displayText: "reset() — full reset: transparent bg, white pen, clear" },
-  { text: "stop", displayText: "stop() — cancel all pending queued commands" },
-  { text: "repeat", displayText: "repeat(n, fn) — call fn(i) n times; return false to break" },
-  { text: "forever", displayText: "forever(fn) — loop fn(i) until fn returns false" },
-  { text: "wait", displayText: "wait(seconds) — pause queue for N seconds before next command" },
-  {
-    text: "get",
-    displayText:
-      "get — getters: .x .y .heading .pu .pd .color .thickness .background .oob .top .left .right .bottom",
-  },
-  { text: "rand", displayText: "rand — randoms: .uni(lo,hi) .norm(mean,sd) .chance(odds)" },
-  { text: "on", displayText: 'on(event, fn) — listen to: "move", "rotate", "pu", "pd"' },
-  { text: "onEdge", displayText: "onEdge(fn) — call fn when turtle crosses canvas edge (fires once per crossing)" },
-  { text: "onCollide", displayText: "onCollide(other, dist, fn) — call fn when this turtle is within dist px of other" },
-  { text: "z", displayText: "z(layer) — switch turtle drawing to this layer (negative = behind camera)" },
-  { text: "seek", displayText: "seek(obj, step?) — face and move step px toward {cx,cy} object; no-op if null" },
-  { text: "goTo", displayText: "goTo(obj) — snap to {cx,cy} object center; no-op if null" },
-];
-
-// ── Drag-to-text toolkit data ─────────────────────────────────────────────
-const TOOLKIT_CATEGORIES = [
-  {
-    name: "Turtle",
-    commands: [
-      { label: "create turtle", code: "const turtle = new Turtle();", hint: "Create a new turtle at layer 0 (default)" },
-      { label: "create turtle at layer", code: "const turtle = new Turtle(1);", hint: "Create a turtle on a specific layer (negative = behind camera, 0 = default)" },
-      { label: "set layer", code: "turtle.z(1);", hint: "Switch turtle drawing to this layer at runtime" },
-      { label: "reset", code: "turtle.reset();", hint: "Full reset: transparent background, white pen, clear canvas and go home" },
-    ],
-  },
-  {
-    name: "Move",
-    commands: [
-      { label: "forward", code: "turtle.forward(50);", hint: "Move forward by 50 pixels" },
-      { label: "backward", code: "turtle.backward(50);", hint: "Move backward by 50 pixels" },
-      { label: "go to x, y", code: "turtle.xy(0, 0);", hint: "Teleport to canvas coordinate (0, 0)" },
-      { label: "move to x", code: "turtle.x(0);", hint: "Move to x, keep current y" },
-      { label: "move to y", code: "turtle.y(0);", hint: "Move to y, keep current x" },
-      { label: "home", code: "turtle.home();", hint: "Return to center and reset heading to 0°" },
-      { label: "clear", code: "turtle.clear();", hint: "Fill background, go home, and put pen down" },
-      { label: "clean", code: "turtle.clean();", hint: "Fill background with color (keeps position)" },
-      { label: "get x", code: "turtle.get.x()", hint: "Current x position of the turtle" },
-      { label: "get y", code: "turtle.get.y()", hint: "Current y position of the turtle" },
-      { label: "out of bounds?", code: "turtle.get.oob()", hint: "True if turtle is outside the canvas bounds" },
-    ],
-  },
-  {
-    name: "Turn",
-    commands: [
-      { label: "right 90°", code: "turtle.right(90);", hint: "Turn right by 90 degrees" },
-      { label: "left 90°", code: "turtle.left(90);", hint: "Turn left by 90 degrees" },
-      { label: "heading", code: "turtle.heading(0);", hint: "Set absolute heading in degrees (0 = up)" },
-      { label: "face x, y", code: "turtle.face(0, 0);", hint: "Point toward canvas coordinate (0, 0)" },
-      { label: "butt x, y", code: "turtle.butt(0, 0);", hint: "Point away from canvas coordinate (0, 0)" },
-      { label: "get heading", code: "turtle.get.heading()", hint: "Current heading in degrees" },
-    ],
-  },
-  {
-    name: "Pen",
-    commands: [
-      { label: "random color", code: "Color.random()", hint: "A random vivid color" },
-      { label: "pen up", code: "turtle.pu();", hint: "Lift pen — move without drawing" },
-      { label: "pen down", code: "turtle.pd();", hint: "Lower pen — draw lines while moving" },
-      { label: "color", code: "turtle.color('red');", hint: "Set pen color (any CSS color string)" },
-      { label: "thickness", code: "turtle.thickness(2);", hint: "Set pen stroke width in pixels" },
-    ],
-  },
-  {
-    name: "Draw",
-    commands: [
-      { label: "disc", code: "turtle.disc(20);", hint: "Draw a filled circle at current position" },
-      { label: "circle", code: "turtle.circle(20);", hint: "Draw a circle outline at current position" },
-      { label: "arc", code: "turtle.arc(50, 90);", hint: "Sweep an arc: arc(radius, degrees) — positive degrees = left, negative = right" },
-    ],
-  },
-  {
-    name: "Control",
-    commands: [
-      { label: "repeat", code: "turtle.repeat(4, () => {\n  \n});", hint: "Run commands N times: repeat(count, fn)" },
-      { label: "forever", code: "turtle.forever(() => {\n  \n});", hint: "Loop forever — return false from fn to stop" },
-      { label: "wait", code: "turtle.wait(1);", hint: "Pause the turtle queue for N seconds" },
-      { label: "stop queue", code: "turtle.stop();", hint: "Cancel all pending queued commands for this turtle" },
-      { label: "set interval", code: "setInterval(() => {\n  \n}, 100);", hint: "Run code every N milliseconds" },
-      { label: "set timeout", code: "setTimeout(() => {\n  \n}, 1000);", hint: "Run code once after N milliseconds" },
-      { label: "random number", code: "randUni(0, 100)", hint: "Random number between lo and hi" },
-      { label: "random uniform", code: "turtle.rand.uni(0, 100)", hint: "Random number between lo and hi (on the turtle object)" },
-      { label: "random normal", code: "turtle.rand.norm(50, 10)", hint: "Random number with normal distribution: rand.norm(mean, stdDev)" },
-      { label: "random chance", code: "turtle.rand.chance(0.5)", hint: "True with given probability (0–1): rand.chance(0.5) = 50% chance" },
-    ],
-  },
-  {
-    name: "Vision",
-    commands: [
-      { label: "seek object", code: "turtle.seek(vision.nearest('person'));", hint: "Move turtle toward nearest detected person (runs detection automatically)" },
-      { label: "goTo object", code: "turtle.goTo(vision.nearest('person'));", hint: "Snap turtle to nearest detected person" },
-      { label: "nearest object", code: "vision.nearest('person')", hint: "Highest-confidence detected object of label — {label, cx, cy, confidence} or null" },
-      { label: "all objects", code: "vision.objects()", hint: "All detected objects — [{label, cx, cy, confidence}]" },
-      { label: "all of label", code: "vision.all('person')", hint: "All detected objects matching label — [{label, cx, cy, confidence}]" },
-      { label: "any detected?", code: "vision.any('person')", hint: "True if any object of this label is currently detected" },
-      { label: "count objects", code: "vision.count('person')", hint: "Number of objects of this label currently detected" },
-      { label: "gesture", code: "vision.gesture()", hint: "Current hand gesture — 'Thumb_Up', 'Open_Palm', 'Closed_Fist', 'Pointing_Up', 'Victory', 'ILoveYou', or null" },
-      { label: "expression", code: "vision.expression()", hint: "Current face expression — 'smile', 'surprise', 'frown', 'mouth_open', 'neutral', or null" },
-      { label: "hands", code: "vision.hands()", hint: "All detected hands — [{gesture, cx, cy, confidence, landmarks}]" },
-      { label: "face", code: "vision.face()", hint: "Detected face — {expression, cx, cy, landmarks} or null" },
-    ],
-  },
-  {
-    name: "Events",
-    commands: [
-      { label: "on move", code: "turtle.on('move', () => {\n  \n});", hint: "Fire when turtle moves (events: 'move', 'rotate', 'pu', 'pd')" },
-      { label: "on edge", code: "turtle.onEdge(() => {\n  \n});", hint: "Fire once each time turtle crosses the canvas edge" },
-      { label: "on collide", code: "turtle.onCollide(other, 20, () => {\n  \n});", hint: "Fire when this turtle comes within dist px of another turtle" },
-      { label: "on key", code: "onKey(\"ArrowUp\", (e) => {\n  \n});", hint: "Fire when a key is pressed — pass 'any' to match all keys" },
-      { label: "on gesture", code: "vision.onGesture(\"Thumb_Up\", () => {\n  \n});", hint: "Fire once when a gesture is first detected — gestures: Thumb_Up, Thumb_Down, Open_Palm, Closed_Fist, Pointing_Up, Victory, ILoveYou" },
-      { label: "on expression", code: "vision.onExpression(\"smile\", () => {\n  \n});", hint: "Fire once when a face expression is first detected — expressions: smile, surprise, frown, mouth_open" },
-    ],
-  },
-];
-
-function getTurtleVarNames(cm) {
-  const names = new Set();
-  const re = /(?:const|let|var)\s+(\w+)\s*=\s*new\s+Turtle\s*\(/g;
-  let m;
-  while ((m = re.exec(cm.getValue())) !== null) names.add(m[1]);
-  return names;
-}
-
-function turtleHint(cm, options) {
-  const Pos = CodeMirror.Pos;
-  const cur = cm.getCursor();
-  let token = cm.getTokenAt(cur);
-
-  if (/\b(?:string|comment)\b/.test(token.type)) return CodeMirror.hint.javascript(cm, options);
-
-  if (!/^[\w$_]*$/.test(token.string)) {
-    token = {
-      start: cur.ch,
-      end: cur.ch,
-      string: "",
-      type: token.string === "." ? "property" : null,
-      state: token.state,
-    };
-  } else if (token.end > cur.ch) {
-    token.end = cur.ch;
-    token.string = token.string.slice(0, cur.ch - token.start);
-  }
-
-  if (token.type === "property") {
-    const dotToken = cm.getTokenAt(Pos(cur.line, token.start));
-    if (dotToken.string === ".") {
-      const objToken = cm.getTokenAt(Pos(cur.line, dotToken.start));
-      if (getTurtleVarNames(cm).has(objToken.string)) {
-        const prefix = token.string;
-        return {
-          list: TURTLE_COMPLETIONS.filter((c) => c.text.startsWith(prefix)),
-          from: Pos(cur.line, token.start),
-          to: Pos(cur.line, token.end),
-        };
-      }
-    }
-  }
-
-  return CodeMirror.hint.javascript(cm, options);
-}
-
 window.onload = () => {
   const splitter = document.querySelector(".splitter");
   const panelLeft = document.querySelector(".panel-left");
@@ -256,6 +72,9 @@ window.onload = () => {
     value: initialCode,
     extraKeys: { "Ctrl-Space": "autocomplete" },
     hintOptions: { hint: turtleHint, completeSingle: false },
+    matchBrackets: true,
+    autoCloseBrackets: true,
+    styleActiveLine: true,
   });
 
   let saveTimer;
@@ -298,7 +117,10 @@ window.onload = () => {
         const call = node.expression;
         const method = call.callee.property.name;
         const argsStr = call.arguments.length
-          ? code.slice(call.arguments[0].range[0], call.arguments[call.arguments.length - 1].range[1])
+          ? code.slice(
+              call.arguments[0].range[0],
+              call.arguments[call.arguments.length - 1].range[1],
+            )
           : "";
         latest.set(method, argsStr);
       }
@@ -312,11 +134,16 @@ window.onload = () => {
     for (const [method, argsStr] of latest) {
       try {
         // eslint-disable-next-line no-new-func
-        new Function("turtles", `
+        new Function(
+          "turtles",
+          `
           if (window.__ar_live) window.__ar_live.${method} = ${argsStr};
           turtles.forEach(t => t.${method}(${argsStr}));
-        `)(turtles);
-      } catch (_) { /* malformed args — skip */ }
+        `,
+        )(turtles);
+      } catch (_) {
+        /* malformed args — skip */
+      }
     }
   }
 
@@ -343,7 +170,9 @@ window.onload = () => {
     toolTipEl.style.top = `${top}px`;
     toolTipEl.style.transform = "translateY(-50%)";
   };
-  const hideTooltip = () => { toolTipEl.style.display = "none"; };
+  const hideTooltip = () => {
+    toolTipEl.style.display = "none";
+  };
 
   for (const cat of TOOLKIT_CATEGORIES) {
     const catEl = document.createElement("div");
@@ -402,7 +231,6 @@ window.onload = () => {
   editor.setOption("lint", true);
 
   let currentScript = null;
-  let currentStream = null;
 
   const turtleCanvas = document.getElementById("turtle");
   const canvasWrapper = document.getElementById("canvasWrapper");
@@ -420,7 +248,11 @@ window.onload = () => {
     c.height = turtleCanvas.height;
     c.className = "ar-turtle-layer";
     Object.assign(c.style, {
-      position: "absolute", top: "0", left: "0", width: "100%", height: "100%",
+      position: "absolute",
+      top: "0",
+      left: "0",
+      width: "100%",
+      height: "100%",
       zIndex: String(z < 0 ? z : 20 + z),
       pointerEvents: "none",
     });
@@ -429,12 +261,12 @@ window.onload = () => {
     return c;
   };
 
-  // Keep wrapper square and within panel bounds.
+  // Keep wrapper 16:9, filling available space.
   new ResizeObserver(([entry]) => {
     const { width, height } = entry.contentRect;
-    const size = Math.min(width, height);
-    canvasWrapper.style.width = `${size}px`;
-    canvasWrapper.style.height = `${size}px`;
+    const w = Math.min(width, (height * 16) / 9);
+    canvasWrapper.style.width = `${w}px`;
+    canvasWrapper.style.height = `${(w * 9) / 16}px`;
   }).observe(document.getElementById("fsContainer"));
 
   // ── Fullscreen ────────────────────────────────────────────────────────────────
@@ -455,77 +287,7 @@ window.onload = () => {
   });
 
   // ── Webcam ─────────────────────────────────────────────────────────────────
-  const video = document.createElement("video");
-  video.autoplay = true;
-  video.playsInline = true;
-  window.__ar_video = video;
-
-  const cameraCanvas = document.getElementById("camera");
-  const cameraCtx = cameraCanvas.getContext("2d");
-  let rafId = null;
-
-  const drawFrame = () => {
-    rafId = requestAnimationFrame(drawFrame);
-    if (video.readyState >= video.HAVE_CURRENT_DATA) {
-      cameraCtx.drawImage(video, 0, 0, cameraCanvas.width, cameraCanvas.height);
-    }
-  };
-
-  let cameraOn = false;
-
-  const startCamera = (deviceId) => {
-    currentStream?.getTracks().forEach((t) => t.stop());
-    currentStream = null;
-    const constraints = { video: deviceId ? { deviceId: { exact: deviceId } } : true };
-    navigator.mediaDevices
-      .getUserMedia(constraints)
-      .then((stream) => {
-        currentStream = stream;
-        video.srcObject = stream;
-        document.getElementById("cameraToggle").style.display = "";
-        if (cameraOn && !rafId) drawFrame();
-        return navigator.mediaDevices.enumerateDevices();
-      })
-      .then(populateCameras)
-      .catch((err) => console.warn("Camera unavailable:", err.message));
-  };
-
-  document.getElementById("cameraToggle").addEventListener("click", () => {
-    cameraOn = !cameraOn;
-    const toggle = document.getElementById("cameraToggle");
-    toggle.textContent = cameraOn ? "Turn Camera Off" : "Turn Camera On";
-    toggle.classList.toggle("active", cameraOn);
-    if (cameraOn) {
-      if (!rafId) drawFrame();
-    } else {
-      cancelAnimationFrame(rafId);
-      rafId = null;
-      cameraCtx.clearRect(0, 0, cameraCanvas.width, cameraCanvas.height);
-    }
-  });
-
-  const populateCameras = (devices) => {
-    const videoDevices = devices.filter((d) => d.kind === "videoinput");
-    const select = document.getElementById("cameraSelect");
-    const current = select.value;
-    select.innerHTML = "";
-    videoDevices.forEach((device, i) => {
-      const opt = document.createElement("option");
-      opt.value = device.deviceId;
-      opt.text = device.label || `Camera ${i + 1}`;
-      if (opt.value === current) opt.selected = true;
-      select.appendChild(opt);
-    });
-    document.getElementById("cameraWrapper").style.display = videoDevices.length > 1 ? "" : "none";
-  };
-
-  document.getElementById("cameraSelect").addEventListener("change", function () {
-    startCamera(this.value);
-  });
-
-  if (navigator.mediaDevices?.getUserMedia) {
-    startCamera(null);
-  }
+  initCamera();
 
   // ── Console capture ───────────────────────────────────────────────────────
   const consoleEl = document.getElementById("console");
@@ -543,7 +305,9 @@ window.onload = () => {
   };
 
   const isMediaPipeLog = (s) =>
-    /^[IW]\d{4}|Graph successfully|TensorFlow Lite|gl_context|inference_feedback|gesture_recognizer_graph|face_landmarker_graph|landmark_projection|hand_gesture|Custom gesture/.test(s);
+    /^[IW]\d{4}|Graph successfully|TensorFlow Lite|gl_context|inference_feedback|gesture_recognizer_graph|face_landmarker_graph|landmark_projection|hand_gesture|Custom gesture/.test(
+      s,
+    );
 
   console.log = (...args) => {
     _log(...args);
@@ -685,13 +449,21 @@ window.onload = () => {
       const turtles = window.__ar_turtles ?? [];
       const intervals = window.__ar_intervals ?? new Map();
       const listeners = window.__ar_listeners ?? [];
-      if (turtles.length > 0 && turtles.every((t) => t.isIdle) && intervals.size === 0 && listeners.length === 0)
+      if (
+        turtles.length > 0 &&
+        turtles.every((t) => t.isIdle) &&
+        intervals.size === 0 &&
+        listeners.length === 0
+      )
         setStopped();
     }, 300);
   };
 
   const pauseRunning = () => {
-    if (idleWatcher) { _nativeClearInterval(idleWatcher); idleWatcher = null; }
+    if (idleWatcher) {
+      _nativeClearInterval(idleWatcher);
+      idleWatcher = null;
+    }
     window.__ar_turtles?.forEach((t) => t.pause());
     window.__ar_pausedIntervals = new Map(window.__ar_intervals);
     for (const id of (window.__ar_intervals ?? new Map()).keys()) _nativeClearInterval(id);
@@ -709,7 +481,9 @@ window.onload = () => {
     }
     window.__ar_pausedIntervals = null;
     const now = Date.now();
-    for (const { cb, delay, createdAt, args } of (window.__ar_pausedTimeouts ?? new Map()).values()) {
+    for (const { cb, delay, createdAt, args } of (
+      window.__ar_pausedTimeouts ?? new Map()
+    ).values()) {
       const remaining = Math.max(0, delay - (now - createdAt));
       window.setTimeout(cb, remaining, ...args);
     }
@@ -752,6 +526,8 @@ window.onload = () => {
       document.body.removeChild(currentScript);
       currentScript = null;
     }
+    window.__ar_layer_objects?.forEach((layer) => layer.reset());
+    window.__ar_layer_objects = new Map();
     for (const [z, c] of window.__ar_layers) {
       c.getContext("2d").clearRect(0, 0, c.width, c.height);
       if (z !== 0) c.remove();
@@ -808,9 +584,6 @@ window.onload = () => {
   const editorEl = document.getElementById("editor");
   const blocklyArea = document.getElementById("blockly-area");
   const blocklyDiv = document.getElementById("blockly-div");
-  const panelRight = document.querySelector(".panel-right");
-  const splitterEl = document.querySelector(".splitter");
-
   const BLOCKS_STORAGE_KEY = "ar-turtle-blocks";
   const toolkitPanel = document.getElementById("toolkit-panel");
 
@@ -827,7 +600,7 @@ window.onload = () => {
     EventTarget.prototype.addEventListener = _nativeELAdd;
     blocklyWorkspace = window.__ar_blocklyWorkspace = Blockly.inject(blocklyDiv, {
       toolbox: TOOLBOX,
-      renderer: 'zelos',
+      renderer: "zelos",
       grid: { spacing: 20, length: 3, colour: "#ccc", snap: true },
       zoom: { controls: true, wheel: true, startScale: 1.0 },
       trashcan: true,

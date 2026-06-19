@@ -14,6 +14,7 @@ const DRAW_COLOR = 260;
 const CTRL_COLOR = 120;
 const TURTLE_COLOR = 20;
 const EVENT_COLOR = 340;
+const LAYER_COLOR = 300;
 
 function turtleField() {
   return new Blockly.FieldVariable("turtle", null, ["Turtle"], "Turtle");
@@ -29,7 +30,9 @@ Blockly.Blocks["turtle_create"] = {
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour(TURTLE_COLOR);
-    this.setTooltip("Create a new turtle on the canvas at the given layer (negative = behind camera, 0 = default)");
+    this.setTooltip(
+      "Create a new turtle on the canvas at the given layer (negative = behind camera, 0 = default)",
+    );
   },
 };
 
@@ -100,9 +103,7 @@ Blockly.Blocks["turtle_left"] = {
 
 Blockly.Blocks["turtle_pen_up"] = {
   init() {
-    this.appendDummyInput()
-      .appendField(turtleField(), "TURTLE")
-      .appendField("pen up");
+    this.appendDummyInput().appendField(turtleField(), "TURTLE").appendField("pen up");
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour(PEN_COLOR);
@@ -112,9 +113,7 @@ Blockly.Blocks["turtle_pen_up"] = {
 
 Blockly.Blocks["turtle_pen_down"] = {
   init() {
-    this.appendDummyInput()
-      .appendField(turtleField(), "TURTLE")
-      .appendField("pen down");
+    this.appendDummyInput().appendField(turtleField(), "TURTLE").appendField("pen down");
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour(PEN_COLOR);
@@ -176,9 +175,7 @@ Blockly.Blocks["turtle_circle"] = {
 
 Blockly.Blocks["turtle_home"] = {
   init() {
-    this.appendDummyInput()
-      .appendField(turtleField(), "TURTLE")
-      .appendField("home");
+    this.appendDummyInput().appendField(turtleField(), "TURTLE").appendField("home");
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour(MOVE_COLOR);
@@ -188,9 +185,7 @@ Blockly.Blocks["turtle_home"] = {
 
 Blockly.Blocks["turtle_clear"] = {
   init() {
-    this.appendDummyInput()
-      .appendField(turtleField(), "TURTLE")
-      .appendField("clear");
+    this.appendDummyInput().appendField(turtleField(), "TURTLE").appendField("clear");
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour(MOVE_COLOR);
@@ -200,9 +195,7 @@ Blockly.Blocks["turtle_clear"] = {
 
 Blockly.Blocks["turtle_clean"] = {
   init() {
-    this.appendDummyInput()
-      .appendField(turtleField(), "TURTLE")
-      .appendField("clean");
+    this.appendDummyInput().appendField(turtleField(), "TURTLE").appendField("clean");
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour(MOVE_COLOR);
@@ -298,9 +291,7 @@ Blockly.Blocks["turtle_wait"] = {
 
 Blockly.Blocks["turtle_forever"] = {
   init() {
-    this.appendDummyInput()
-      .appendField(turtleField(), "TURTLE")
-      .appendField("forever");
+    this.appendDummyInput().appendField(turtleField(), "TURTLE").appendField("forever");
     this.appendStatementInput("DO").appendField("do");
     this.setPreviousStatement(true);
     this.setNextStatement(true);
@@ -347,7 +338,7 @@ Blockly.Blocks["event_on_key"] = {
           ["9", "9"],
           ["any key", "__any__"],
         ]),
-        "KEY"
+        "KEY",
       )
       .appendField("pressed");
     this.setNextStatement(true);
@@ -384,7 +375,7 @@ Blockly.Blocks["event_on_gesture"] = {
           ["✌️ peace sign", "Victory"],
           ["🤟 I love you", "ILoveYou"],
         ]),
-        "GESTURE"
+        "GESTURE",
       )
       .appendField("detected");
     this.setNextStatement(true);
@@ -405,7 +396,7 @@ Blockly.Blocks["event_on_expression"] = {
           ["☹️ frown", "frown"],
           ["😮 mouth open", "mouth_open"],
         ]),
-        "EXPRESSION"
+        "EXPRESSION",
       )
       .appendField("detected");
     this.setNextStatement(true);
@@ -426,7 +417,9 @@ Blockly.Blocks["event_on_collide"] = {
     this.appendDummyInput().appendField("px");
     this.setNextStatement(true);
     this.setColour(EVENT_COLOR);
-    this.setTooltip("Run attached blocks when two turtles come within the given distance of each other");
+    this.setTooltip(
+      "Run attached blocks when two turtles come within the given distance of each other",
+    );
   },
 };
 
@@ -490,9 +483,7 @@ Blockly.Blocks["turtle_arc"] = {
 
 Blockly.Blocks["turtle_seek"] = {
   init() {
-    this.appendValueInput("OBJ")
-      .appendField(turtleField(), "TURTLE")
-      .appendField("seek");
+    this.appendValueInput("OBJ").appendField(turtleField(), "TURTLE").appendField("seek");
     this.appendValueInput("STEP").setCheck("Number").appendField("step");
     this.setInputsInline(true);
     this.setPreviousStatement(true);
@@ -504,9 +495,7 @@ Blockly.Blocks["turtle_seek"] = {
 
 Blockly.Blocks["turtle_goto"] = {
   init() {
-    this.appendValueInput("OBJ")
-      .appendField(turtleField(), "TURTLE")
-      .appendField("go to");
+    this.appendValueInput("OBJ").appendField(turtleField(), "TURTLE").appendField("go to");
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour(MOVE_COLOR);
@@ -516,9 +505,7 @@ Blockly.Blocks["turtle_goto"] = {
 
 Blockly.Blocks["turtle_reset"] = {
   init() {
-    this.appendDummyInput()
-      .appendField(turtleField(), "TURTLE")
-      .appendField("reset");
+    this.appendDummyInput().appendField(turtleField(), "TURTLE").appendField("reset");
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour(TURTLE_COLOR);
@@ -544,7 +531,9 @@ Blockly.Blocks["vision_nearest"] = {
       .appendField(new Blockly.FieldTextInput("person"), "LABEL");
     this.setOutput(true, null);
     this.setColour(185);
-    this.setTooltip("Highest-confidence detected object of this label — {label, cx, cy, confidence} or null");
+    this.setTooltip(
+      "Highest-confidence detected object of this label — {label, cx, cy, confidence} or null",
+    );
   },
 };
 
@@ -571,11 +560,27 @@ Blockly.Blocks["vision_count"] = {
   },
 };
 
+Blockly.Blocks["canvas_width"] = {
+  init() {
+    this.appendDummyInput().appendField(turtleField(), "TURTLE").appendField("canvas width");
+    this.setOutput(true, "Number");
+    this.setColour(MOVE_COLOR);
+    this.setTooltip("Width of this turtle's canvas layer in pixels");
+  },
+};
+
+Blockly.Blocks["canvas_height"] = {
+  init() {
+    this.appendDummyInput().appendField(turtleField(), "TURTLE").appendField("canvas height");
+    this.setOutput(true, "Number");
+    this.setColour(MOVE_COLOR);
+    this.setTooltip("Height of this turtle's canvas layer in pixels");
+  },
+};
+
 Blockly.Blocks["turtle_get_x"] = {
   init() {
-    this.appendDummyInput()
-      .appendField(turtleField(), "TURTLE")
-      .appendField("x");
+    this.appendDummyInput().appendField(turtleField(), "TURTLE").appendField("x");
     this.setOutput(true, "Number");
     this.setColour(MOVE_COLOR);
     this.setTooltip("Current x position of the turtle");
@@ -584,9 +589,7 @@ Blockly.Blocks["turtle_get_x"] = {
 
 Blockly.Blocks["turtle_get_y"] = {
   init() {
-    this.appendDummyInput()
-      .appendField(turtleField(), "TURTLE")
-      .appendField("y");
+    this.appendDummyInput().appendField(turtleField(), "TURTLE").appendField("y");
     this.setOutput(true, "Number");
     this.setColour(MOVE_COLOR);
     this.setTooltip("Current y position of the turtle");
@@ -631,10 +634,13 @@ javascriptGenerator.forBlock["turtle_left"] = (block, gen) => {
 };
 
 javascriptGenerator.forBlock["turtle_pen_up"] = (block, gen) => `${turtleName(block, gen)}.pu();\n`;
-javascriptGenerator.forBlock["turtle_pen_down"] = (block, gen) => `${turtleName(block, gen)}.pd();\n`;
+javascriptGenerator.forBlock["turtle_pen_down"] = (block, gen) =>
+  `${turtleName(block, gen)}.pd();\n`;
 javascriptGenerator.forBlock["turtle_home"] = (block, gen) => `${turtleName(block, gen)}.home();\n`;
-javascriptGenerator.forBlock["turtle_clear"] = (block, gen) => `${turtleName(block, gen)}.clear();\n`;
-javascriptGenerator.forBlock["turtle_clean"] = (block, gen) => `${turtleName(block, gen)}.clean();\n`;
+javascriptGenerator.forBlock["turtle_clear"] = (block, gen) =>
+  `${turtleName(block, gen)}.clear();\n`;
+javascriptGenerator.forBlock["turtle_clean"] = (block, gen) =>
+  `${turtleName(block, gen)}.clean();\n`;
 
 javascriptGenerator.forBlock["turtle_color"] = (block, gen) => {
   const c = gen.valueToCode(block, "COLOR", Order.NONE) || "'#000000'";
@@ -684,8 +690,7 @@ javascriptGenerator.forBlock["timer_set_timeout"] = (block, gen) => {
   return `setTimeout(() => {\n${branch}}, ${delay});\n`;
 };
 
-javascriptGenerator.forBlock["color_random"] = () =>
-  [`Color.random()`, Order.ATOMIC];
+javascriptGenerator.forBlock["color_random"] = () => [`Color.random()`, Order.ATOMIC];
 
 javascriptGenerator.forBlock["console_log"] = (block, gen) => {
   const val = gen.valueToCode(block, "VALUE", Order.NONE) || '""';
@@ -808,6 +813,252 @@ javascriptGenerator.forBlock["turtle_get_y"] = (block, gen) => {
   return [`${turtleName(block, gen)}.get.y()`, Order.FUNCTION_CALL];
 };
 
+javascriptGenerator.forBlock["canvas_width"] = (block, gen) => [
+  `${turtleName(block, gen)}.getCanvas().width`,
+  Order.FUNCTION_CALL,
+];
+javascriptGenerator.forBlock["canvas_height"] = (block, gen) => [
+  `${turtleName(block, gen)}.getCanvas().height`,
+  Order.FUNCTION_CALL,
+];
+
+// ── Layer block definitions ───────────────────────────────────────────────
+
+Blockly.Blocks["layer_blur"] = {
+  init() {
+    this.appendDummyInput()
+      .appendField(turtleField(), "TURTLE")
+      .appendField("layer blur")
+      .appendField(new FieldSlider(5, 0, 40, 1), "PX")
+      .appendField("px");
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.setColour(LAYER_COLOR);
+    this.setTooltip("Gaussian blur the layer (px)");
+  },
+};
+
+Blockly.Blocks["layer_hue"] = {
+  init() {
+    this.appendDummyInput()
+      .appendField(turtleField(), "TURTLE")
+      .appendField("layer hue shift")
+      .appendField(new FieldAngle(0), "DEG");
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.setColour(LAYER_COLOR);
+    this.setTooltip("Shift hue by degrees (0–360)");
+  },
+};
+
+Blockly.Blocks["layer_brightness"] = {
+  init() {
+    this.appendDummyInput()
+      .appendField(turtleField(), "TURTLE")
+      .appendField("layer brightness")
+      .appendField(new FieldSlider(1.5, 0, 3, 0.1), "N");
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.setColour(LAYER_COLOR);
+    this.setTooltip("Adjust brightness (1 = normal, 2 = double)");
+  },
+};
+
+Blockly.Blocks["layer_saturate"] = {
+  init() {
+    this.appendDummyInput()
+      .appendField(turtleField(), "TURTLE")
+      .appendField("layer saturate")
+      .appendField(new FieldSlider(2, 0, 3, 0.1), "N");
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.setColour(LAYER_COLOR);
+    this.setTooltip("Adjust saturation (1 = normal, 0 = grayscale)");
+  },
+};
+
+Blockly.Blocks["layer_invert"] = {
+  init() {
+    this.appendDummyInput()
+      .appendField(turtleField(), "TURTLE")
+      .appendField("layer invert")
+      .appendField(new FieldSlider(1, 0, 1, 0.1), "N");
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.setColour(LAYER_COLOR);
+    this.setTooltip("Invert colors (0–1, 1 = full invert)");
+  },
+};
+
+Blockly.Blocks["layer_opacity"] = {
+  init() {
+    this.appendDummyInput()
+      .appendField(turtleField(), "TURTLE")
+      .appendField("layer opacity")
+      .appendField(new FieldSlider(0.5, 0, 1, 0.01), "N");
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.setColour(LAYER_COLOR);
+    this.setTooltip("Layer opacity (0 = invisible, 1 = full)");
+  },
+};
+
+Blockly.Blocks["layer_rotate"] = {
+  init() {
+    this.appendDummyInput()
+      .appendField(turtleField(), "TURTLE")
+      .appendField("layer rotate")
+      .appendField(new FieldAngle(45), "DEG");
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.setColour(LAYER_COLOR);
+    this.setTooltip("Rotate the entire layer in degrees");
+  },
+};
+
+Blockly.Blocks["layer_rotateX"] = {
+  init() {
+    this.appendValueInput("DEG")
+      .setCheck("Number")
+      .appendField(turtleField(), "TURTLE")
+      .appendField("layer tilt X");
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.setColour(LAYER_COLOR);
+    this.setTooltip("Tilt layer on X axis in degrees (perspective 600px auto-applied)");
+  },
+};
+
+Blockly.Blocks["layer_rotateY"] = {
+  init() {
+    this.appendValueInput("DEG")
+      .setCheck("Number")
+      .appendField(turtleField(), "TURTLE")
+      .appendField("layer tilt Y");
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.setColour(LAYER_COLOR);
+    this.setTooltip("Tilt layer on Y axis in degrees (perspective 600px auto-applied)");
+  },
+};
+
+Blockly.Blocks["layer_scale"] = {
+  init() {
+    this.appendValueInput("N")
+      .setCheck("Number")
+      .appendField(turtleField(), "TURTLE")
+      .appendField("layer scale");
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.setColour(LAYER_COLOR);
+    this.setTooltip("Scale the layer (1 = normal, 2 = double size)");
+  },
+};
+
+Blockly.Blocks["layer_perspective"] = {
+  init() {
+    this.appendValueInput("PX")
+      .setCheck("Number")
+      .appendField(turtleField(), "TURTLE")
+      .appendField("layer perspective");
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.setColour(LAYER_COLOR);
+    this.setTooltip("Perspective distance for tilt X/Y (px) — smaller = more dramatic");
+  },
+};
+
+Blockly.Blocks["layer_clip"] = {
+  init() {
+    this.appendValueInput("STR").appendField(turtleField(), "TURTLE").appendField("layer clip");
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.setColour(LAYER_COLOR);
+    this.setTooltip(
+      "Clip layer to a CSS clip-path shape (e.g. 'circle(50%)', 'polygon(50% 0%, 100% 100%, 0% 100%)')",
+    );
+  },
+};
+
+Blockly.Blocks["layer_filter_raw"] = {
+  init() {
+    this.appendValueInput("STR")
+      .appendField(turtleField(), "TURTLE")
+      .appendField("layer raw filter");
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.setColour(LAYER_COLOR);
+    this.setTooltip("CSS filter string — overrides named filter methods");
+  },
+};
+
+Blockly.Blocks["layer_reset"] = {
+  init() {
+    this.appendDummyInput().appendField(turtleField(), "TURTLE").appendField("layer reset effects");
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.setColour(LAYER_COLOR);
+    this.setTooltip("Remove all CSS effects from this turtle's layer");
+  },
+};
+
+// ── Layer code generators ─────────────────────────────────────────────────
+
+const layerExpr = (block, gen) => `${turtleName(block, gen)}.getLayer()`;
+
+javascriptGenerator.forBlock["layer_blur"] = (block, gen) =>
+  `${layerExpr(block, gen)}.blur(${block.getFieldValue("PX")});\n`;
+
+javascriptGenerator.forBlock["layer_hue"] = (block, gen) =>
+  `${layerExpr(block, gen)}.hue(${block.getFieldValue("DEG")});\n`;
+
+javascriptGenerator.forBlock["layer_brightness"] = (block, gen) =>
+  `${layerExpr(block, gen)}.brightness(${block.getFieldValue("N")});\n`;
+
+javascriptGenerator.forBlock["layer_saturate"] = (block, gen) =>
+  `${layerExpr(block, gen)}.saturate(${block.getFieldValue("N")});\n`;
+
+javascriptGenerator.forBlock["layer_invert"] = (block, gen) =>
+  `${layerExpr(block, gen)}.invert(${block.getFieldValue("N")});\n`;
+
+javascriptGenerator.forBlock["layer_opacity"] = (block, gen) =>
+  `${layerExpr(block, gen)}.opacity(${block.getFieldValue("N")});\n`;
+
+javascriptGenerator.forBlock["layer_rotate"] = (block, gen) =>
+  `${layerExpr(block, gen)}.rotate(${block.getFieldValue("DEG")});\n`;
+
+javascriptGenerator.forBlock["layer_rotateX"] = (block, gen) => {
+  const deg = gen.valueToCode(block, "DEG", Order.NONE) || "30";
+  return `${layerExpr(block, gen)}.rotateX(${deg});\n`;
+};
+
+javascriptGenerator.forBlock["layer_rotateY"] = (block, gen) => {
+  const deg = gen.valueToCode(block, "DEG", Order.NONE) || "30";
+  return `${layerExpr(block, gen)}.rotateY(${deg});\n`;
+};
+
+javascriptGenerator.forBlock["layer_scale"] = (block, gen) => {
+  const n = gen.valueToCode(block, "N", Order.NONE) || "1";
+  return `${layerExpr(block, gen)}.scale(${n});\n`;
+};
+
+javascriptGenerator.forBlock["layer_perspective"] = (block, gen) => {
+  const px = gen.valueToCode(block, "PX", Order.NONE) || "600";
+  return `${layerExpr(block, gen)}.perspective(${px});\n`;
+};
+
+javascriptGenerator.forBlock["layer_clip"] = (block, gen) => {
+  const str = gen.valueToCode(block, "STR", Order.NONE) || "'circle(50%)'";
+  return `${layerExpr(block, gen)}.clip(${str});\n`;
+};
+
+javascriptGenerator.forBlock["layer_filter_raw"] = (block, gen) => {
+  const str = gen.valueToCode(block, "STR", Order.NONE) || "''";
+  return `${layerExpr(block, gen)}.filter(${str});\n`;
+};
+
+javascriptGenerator.forBlock["layer_reset"] = (block, gen) => `${layerExpr(block, gen)}.reset();\n`;
+
 // ── Toolbox definition ────────────────────────────────────────────────────
 
 export const TOOLBOX = {
@@ -838,6 +1089,8 @@ export const TOOLBOX = {
         { kind: "block", type: "turtle_create" },
         { kind: "block", type: "turtle_set_layer" },
         { kind: "block", type: "turtle_reset" },
+        { kind: "block", type: "canvas_width" },
+        { kind: "block", type: "canvas_height" },
       ],
     },
     {
@@ -855,7 +1108,14 @@ export const TOOLBOX = {
           type: "turtle_backward",
           inputs: { AMOUNT: { shadow: { type: "math_number", fields: { NUM: 50 } } } },
         },
-        { kind: "block", type: "turtle_xy", inputs: { X: { shadow: { type: "math_number", fields: { NUM: 0 } } }, Y: { shadow: { type: "math_number", fields: { NUM: 0 } } } } },
+        {
+          kind: "block",
+          type: "turtle_xy",
+          inputs: {
+            X: { shadow: { type: "math_number", fields: { NUM: 0 } } },
+            Y: { shadow: { type: "math_number", fields: { NUM: 0 } } },
+          },
+        },
         { kind: "block", type: "turtle_get_x" },
         { kind: "block", type: "turtle_get_y" },
         { kind: "block", type: "turtle_home" },
@@ -868,10 +1128,25 @@ export const TOOLBOX = {
       name: "Turn",
       colour: String(TURN_COLOR),
       contents: [
-        { kind: "block", type: "turtle_right", inputs: { DEGREES: { shadow: { type: "math_number", fields: { NUM: 90 } } } } },
-        { kind: "block", type: "turtle_left", inputs: { DEGREES: { shadow: { type: "math_number", fields: { NUM: 90 } } } } },
+        {
+          kind: "block",
+          type: "turtle_right",
+          inputs: { DEGREES: { shadow: { type: "math_number", fields: { NUM: 90 } } } },
+        },
+        {
+          kind: "block",
+          type: "turtle_left",
+          inputs: { DEGREES: { shadow: { type: "math_number", fields: { NUM: 90 } } } },
+        },
         { kind: "block", type: "turtle_heading" },
-        { kind: "block", type: "turtle_face", inputs: { X: { shadow: { type: "math_number", fields: { NUM: 0 } } }, Y: { shadow: { type: "math_number", fields: { NUM: 0 } } } } },
+        {
+          kind: "block",
+          type: "turtle_face",
+          inputs: {
+            X: { shadow: { type: "math_number", fields: { NUM: 0 } } },
+            Y: { shadow: { type: "math_number", fields: { NUM: 0 } } },
+          },
+        },
       ],
     },
     {
@@ -905,7 +1180,14 @@ export const TOOLBOX = {
           type: "turtle_circle",
           inputs: { RADIUS: { shadow: { type: "math_number", fields: { NUM: 20 } } } },
         },
-        { kind: "block", type: "turtle_arc", inputs: { RADIUS: { shadow: { type: "math_number", fields: { NUM: 50 } } }, DEGREES: { shadow: { type: "math_number", fields: { NUM: 90 } } } } },
+        {
+          kind: "block",
+          type: "turtle_arc",
+          inputs: {
+            RADIUS: { shadow: { type: "math_number", fields: { NUM: 50 } } },
+            DEGREES: { shadow: { type: "math_number", fields: { NUM: 90 } } },
+          },
+        },
       ],
     },
     {
@@ -939,6 +1221,51 @@ export const TOOLBOX = {
           type: "console_log",
           inputs: { VALUE: { shadow: { type: "text", fields: { TEXT: "hello" } } } },
         },
+      ],
+    },
+    {
+      kind: "category",
+      name: "Layer",
+      colour: String(LAYER_COLOR),
+      contents: [
+        { kind: "block", type: "layer_blur" },
+        { kind: "block", type: "layer_hue" },
+        { kind: "block", type: "layer_brightness" },
+        { kind: "block", type: "layer_saturate" },
+        { kind: "block", type: "layer_invert" },
+        { kind: "block", type: "layer_opacity" },
+        { kind: "block", type: "layer_rotate" },
+        {
+          kind: "block",
+          type: "layer_rotateX",
+          inputs: { DEG: { shadow: { type: "math_number", fields: { NUM: 30 } } } },
+        },
+        {
+          kind: "block",
+          type: "layer_rotateY",
+          inputs: { DEG: { shadow: { type: "math_number", fields: { NUM: 30 } } } },
+        },
+        {
+          kind: "block",
+          type: "layer_scale",
+          inputs: { N: { shadow: { type: "math_number", fields: { NUM: 1.5 } } } },
+        },
+        {
+          kind: "block",
+          type: "layer_perspective",
+          inputs: { PX: { shadow: { type: "math_number", fields: { NUM: 600 } } } },
+        },
+        {
+          kind: "block",
+          type: "layer_clip",
+          inputs: { STR: { shadow: { type: "text", fields: { TEXT: "circle(50%)" } } } },
+        },
+        {
+          kind: "block",
+          type: "layer_filter_raw",
+          inputs: { STR: { shadow: { type: "text", fields: { TEXT: "blur(5px)" } } } },
+        },
+        { kind: "block", type: "layer_reset" },
       ],
     },
     {
@@ -1038,7 +1365,14 @@ export const TOOLBOX = {
         { kind: "block", type: "math_constrain" },
         { kind: "block", type: "math_random_int" },
         { kind: "block", type: "math_random_float" },
-        { kind: "block", type: "turtle_rand_uni", inputs: { LO: { shadow: { type: "math_number", fields: { NUM: 0 } } }, HI: { shadow: { type: "math_number", fields: { NUM: 100 } } } } },
+        {
+          kind: "block",
+          type: "turtle_rand_uni",
+          inputs: {
+            LO: { shadow: { type: "math_number", fields: { NUM: 0 } } },
+            HI: { shadow: { type: "math_number", fields: { NUM: 100 } } },
+          },
+        },
       ],
     },
     {

@@ -69,10 +69,13 @@ export function friendlyError(raw) {
   const notDef = m.match(/(\w+) is not defined/);
   if (notDef) return `'${notDef[1]}' is not defined — did you forget to create it?`;
 
-  const prop = m.match(/Cannot read propert(?:y|ies) of (undefined|null)(?: \(reading ['"](\w+)['"]\))?/);
-  if (prop) return prop[2]
-    ? `Tried to use .${prop[2]} on something that doesn't exist yet.`
-    : `Tried to use a property on something that doesn't exist yet.`;
+  const prop = m.match(
+    /Cannot read propert(?:y|ies) of (undefined|null)(?: \(reading ['"](\w+)['"]\))?/,
+  );
+  if (prop)
+    return prop[2]
+      ? `Tried to use .${prop[2]} on something that doesn't exist yet.`
+      : `Tried to use a property on something that doesn't exist yet.`;
 
   if (m.includes("Unexpected token") || m.includes("Unexpected end of"))
     return `Syntax error — check for missing or extra brackets, quotes, or commas.`;
@@ -114,7 +117,11 @@ export function transformForLivePatch(code) {
       const firstArg = call.arguments[0];
       if (firstArg?.type === "Literal") {
         liveDefaults[method] = firstArg.value;
-        patches.push({ pos: firstArg.range[0], end: firstArg.range[1], str: `window.__ar_live.${method}` });
+        patches.push({
+          pos: firstArg.range[0],
+          end: firstArg.range[1],
+          str: `window.__ar_live.${method}`,
+        });
       }
     }
     for (const v of Object.values(node)) {
@@ -129,7 +136,8 @@ export function transformForLivePatch(code) {
       node.type === "CallExpression" &&
       node.callee?.type === "Identifier" &&
       (node.callee.name === "setInterval" || node.callee.name === "setTimeout") &&
-      (node.arguments[0]?.type === "ArrowFunctionExpression" || node.arguments[0]?.type === "FunctionExpression")
+      (node.arguments[0]?.type === "ArrowFunctionExpression" ||
+        node.arguments[0]?.type === "FunctionExpression")
     ) {
       walkCallback(node.arguments[0].body);
       return;
@@ -141,8 +149,12 @@ export function transformForLivePatch(code) {
       turtleNames.has(node.callee.object.name)
     ) {
       const method = node.callee.property?.name;
-      const cbArg = method === "forever" ? node.arguments[0] : method === "repeat" ? node.arguments[1] : null;
-      if (cbArg && (cbArg.type === "ArrowFunctionExpression" || cbArg.type === "FunctionExpression")) {
+      const cbArg =
+        method === "forever" ? node.arguments[0] : method === "repeat" ? node.arguments[1] : null;
+      if (
+        cbArg &&
+        (cbArg.type === "ArrowFunctionExpression" || cbArg.type === "FunctionExpression")
+      ) {
         walkCallback(cbArg.body);
         return;
       }

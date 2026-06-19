@@ -8,6 +8,7 @@ This is a web app that displays Turtle programming on top of a live webcam feed 
 
 * Draw on top of and react to things in your camera with a [Turtle API](https://github.com/greim/jtg)
   * Layer compositing with multiple turtles and z-indexing
+    * Powerful canvas layer editing API for power users
   * React to hand gestures, facial expressions, or objects detected with a [MediaPipe](https://github.com/google-ai-edge/mediapipe) API
 * Learner-friendly IDE (powered by [CodeMirror](https://codemirror.net/5/))
   * Syntax highlighting

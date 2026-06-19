@@ -5,10 +5,13 @@ MIT License — see full text in the original source.
 Modernized to ES2022 by the ar-turtle project.
 */
 
+import { getLayerForZ } from "./layer.js";
+
 export class Turtle {
   constructor(z = 0) {
     const canvas = window.__ar_getLayerCanvas?.(0) ?? document.getElementById("turtle");
     let ctx = (window.__ar_getLayerCanvas?.(z) ?? canvas).getContext("2d");
+    let currentZ = z;
     ctx.lineCap = "round";
     const canvasWidth = canvas.width;
     const canvasHeight = canvas.height;
@@ -77,7 +80,9 @@ export class Turtle {
           setTimeout(run, 200);
         }
       };
-      restartQueue = () => { if (!queueActive && !stopped) run(); };
+      restartQueue = () => {
+        if (!queueActive && !stopped) run();
+      };
       run();
       return (fn) => {
         funs.push(fn);
@@ -107,7 +112,9 @@ export class Turtle {
         oldY = args.y;
         trigger("move", args);
       };
-      fn.resetCache = () => { oldFg = oldWidth = undefined; };
+      fn.resetCache = () => {
+        oldFg = oldWidth = undefined;
+      };
       return fn;
     })();
 
@@ -219,7 +226,19 @@ export class Turtle {
       pos.x = cx + Math.cos(endA) * radius;
       pos.y = cy + Math.sin(endA) * radius;
       heading += d;
-      const arcArgs = { cx, cy, r: radius, startA, endA, ccw, x: pos.x, y: pos.y, pd: penDown, width, fg: foreground };
+      const arcArgs = {
+        cx,
+        cy,
+        r: radius,
+        startA,
+        endA,
+        ccw,
+        x: pos.x,
+        y: pos.y,
+        pd: penDown,
+        width,
+        fg: foreground,
+      };
       q(() => {
         if (arcArgs.pd) {
           ctx.beginPath();
@@ -295,13 +314,18 @@ export class Turtle {
     };
 
     // ── Layer ────────────────────────────────────────────────────────────────
+    this.getCanvas = () => ctx.canvas;
+
     this.z = (n) => {
+      currentZ = n;
       const newCanvas = window.__ar_getLayerCanvas?.(n) ?? canvas;
       ctx = newCanvas.getContext("2d");
       ctx.lineCap = "round";
       go.resetCache();
       return this;
     };
+
+    this.getLayer = () => getLayerForZ(currentZ);
 
     // ── Sprite ───────────────────────────────────────────────────────────────
     const sprite = document.createElement("span");
@@ -343,8 +367,13 @@ export class Turtle {
       ro.disconnect();
     };
 
-    this.pause = () => { paused = true; };
-    this.resume = () => { paused = false; restartQueue(); };
+    this.pause = () => {
+      paused = true;
+    };
+    this.resume = () => {
+      paused = false;
+      restartQueue();
+    };
 
     // ── Loopers ──────────────────────────────────────────────────────────────
     this.repeat = (amount, fn) => {
@@ -359,10 +388,19 @@ export class Turtle {
       activeLoops++;
       let i = 0;
       const tick = () => {
-        if (stopped) { activeLoops--; return; }
-        if (paused) { setTimeout(tick, 50); return; }
+        if (stopped) {
+          activeLoops--;
+          return;
+        }
+        if (paused) {
+          setTimeout(tick, 50);
+          return;
+        }
         const result = fn.call(this, i++);
-        if (!result && result !== undefined) { activeLoops--; return; }
+        if (!result && result !== undefined) {
+          activeLoops--;
+          return;
+        }
         setTimeout(tick, 0);
       };
       tick();
@@ -370,7 +408,9 @@ export class Turtle {
     };
 
     this.wait = (seconds) => {
-      q(() => { nextDelay = Math.round(seconds * 1000); });
+      q(() => {
+        nextDelay = Math.round(seconds * 1000);
+      });
       return this;
     };
 
