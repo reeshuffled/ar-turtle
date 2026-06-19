@@ -23,11 +23,26 @@ Blockly.Blocks["turtle_create"] = {
   init() {
     this.appendDummyInput()
       .appendField("create turtle")
-      .appendField(turtleField(), "TURTLE");
+      .appendField(turtleField(), "TURTLE")
+      .appendField("at layer")
+      .appendField(new Blockly.FieldNumber(0, null, null, 1), "ZLAYER");
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour(TURTLE_COLOR);
-    this.setTooltip("Create a new turtle on the canvas");
+    this.setTooltip("Create a new turtle on the canvas at the given layer (negative = behind camera, 0 = default)");
+  },
+};
+
+Blockly.Blocks["turtle_set_layer"] = {
+  init() {
+    this.appendDummyInput()
+      .appendField(turtleField(), "TURTLE")
+      .appendField("set layer")
+      .appendField(new Blockly.FieldNumber(0, null, null, 1), "ZLAYER");
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.setColour(TURTLE_COLOR);
+    this.setTooltip("Switch turtle drawing to this layer (negative = behind camera, 0 = default)");
   },
 };
 
@@ -59,10 +74,10 @@ Blockly.Blocks["turtle_backward"] = {
 
 Blockly.Blocks["turtle_right"] = {
   init() {
-    this.appendDummyInput()
+    this.appendValueInput("DEGREES")
+      .setCheck("Number")
       .appendField(turtleField(), "TURTLE")
-      .appendField("right")
-      .appendField(new FieldAngle(90), "DEGREES");
+      .appendField("right");
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour(TURN_COLOR);
@@ -72,10 +87,10 @@ Blockly.Blocks["turtle_right"] = {
 
 Blockly.Blocks["turtle_left"] = {
   init() {
-    this.appendDummyInput()
+    this.appendValueInput("DEGREES")
+      .setCheck("Number")
       .appendField(turtleField(), "TURTLE")
-      .appendField("left")
-      .appendField(new FieldAngle(90), "DEGREES");
+      .appendField("left");
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.setColour(TURN_COLOR);
@@ -281,6 +296,19 @@ Blockly.Blocks["turtle_wait"] = {
   },
 };
 
+Blockly.Blocks["turtle_forever"] = {
+  init() {
+    this.appendDummyInput()
+      .appendField(turtleField(), "TURTLE")
+      .appendField("forever");
+    this.appendStatementInput("DO").appendField("do");
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.setColour(CTRL_COLOR);
+    this.setTooltip("Loop forever — return false from inside to stop");
+  },
+};
+
 Blockly.Blocks["event_on_start"] = {
   init() {
     this.hat = "cap";
@@ -402,6 +430,169 @@ Blockly.Blocks["event_on_collide"] = {
   },
 };
 
+Blockly.Blocks["turtle_xy"] = {
+  init() {
+    this.appendValueInput("X")
+      .setCheck("Number")
+      .appendField(turtleField(), "TURTLE")
+      .appendField("go to x");
+    this.appendValueInput("Y").setCheck("Number").appendField("y");
+    this.setInputsInline(true);
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.setColour(MOVE_COLOR);
+    this.setTooltip("Teleport to canvas coordinate (x, y)");
+  },
+};
+
+Blockly.Blocks["turtle_heading"] = {
+  init() {
+    this.appendDummyInput()
+      .appendField(turtleField(), "TURTLE")
+      .appendField("heading")
+      .appendField(new FieldAngle(0), "DEGREES");
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.setColour(TURN_COLOR);
+    this.setTooltip("Set absolute heading in degrees");
+  },
+};
+
+Blockly.Blocks["turtle_face"] = {
+  init() {
+    this.appendValueInput("X")
+      .setCheck("Number")
+      .appendField(turtleField(), "TURTLE")
+      .appendField("face x");
+    this.appendValueInput("Y").setCheck("Number").appendField("y");
+    this.setInputsInline(true);
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.setColour(TURN_COLOR);
+    this.setTooltip("Point turtle toward canvas coordinate (x, y)");
+  },
+};
+
+Blockly.Blocks["turtle_arc"] = {
+  init() {
+    this.appendValueInput("RADIUS")
+      .setCheck("Number")
+      .appendField(turtleField(), "TURTLE")
+      .appendField("arc radius");
+    this.appendValueInput("DEGREES").setCheck("Number").appendField("degrees");
+    this.setInputsInline(true);
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.setColour(DRAW_COLOR);
+    this.setTooltip("Sweep an arc: positive degrees = left, negative = right");
+  },
+};
+
+Blockly.Blocks["turtle_seek"] = {
+  init() {
+    this.appendValueInput("OBJ")
+      .appendField(turtleField(), "TURTLE")
+      .appendField("seek");
+    this.appendValueInput("STEP").setCheck("Number").appendField("step");
+    this.setInputsInline(true);
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.setColour(MOVE_COLOR);
+    this.setTooltip("Face and move step px toward a vision object; no-op if null");
+  },
+};
+
+Blockly.Blocks["turtle_goto"] = {
+  init() {
+    this.appendValueInput("OBJ")
+      .appendField(turtleField(), "TURTLE")
+      .appendField("go to");
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.setColour(MOVE_COLOR);
+    this.setTooltip("Snap to a vision object center; no-op if null");
+  },
+};
+
+Blockly.Blocks["turtle_reset"] = {
+  init() {
+    this.appendDummyInput()
+      .appendField(turtleField(), "TURTLE")
+      .appendField("reset");
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.setColour(TURTLE_COLOR);
+    this.setTooltip("Full reset: transparent background, white pen, clear");
+  },
+};
+
+Blockly.Blocks["turtle_rand_uni"] = {
+  init() {
+    this.appendValueInput("LO").setCheck("Number").appendField("random");
+    this.appendValueInput("HI").setCheck("Number").appendField("to");
+    this.setInputsInline(true);
+    this.setOutput(true, "Number");
+    this.setColour(230);
+    this.setTooltip("Random number between lo and hi");
+  },
+};
+
+Blockly.Blocks["vision_nearest"] = {
+  init() {
+    this.appendDummyInput()
+      .appendField("nearest")
+      .appendField(new Blockly.FieldTextInput("person"), "LABEL");
+    this.setOutput(true, null);
+    this.setColour(185);
+    this.setTooltip("Highest-confidence detected object of this label — {label, cx, cy, confidence} or null");
+  },
+};
+
+Blockly.Blocks["vision_any"] = {
+  init() {
+    this.appendDummyInput()
+      .appendField("any")
+      .appendField(new Blockly.FieldTextInput("person"), "LABEL")
+      .appendField("detected");
+    this.setOutput(true, "Boolean");
+    this.setColour(185);
+    this.setTooltip("True if any object of this label is currently detected");
+  },
+};
+
+Blockly.Blocks["vision_count"] = {
+  init() {
+    this.appendDummyInput()
+      .appendField("count of")
+      .appendField(new Blockly.FieldTextInput("person"), "LABEL");
+    this.setOutput(true, "Number");
+    this.setColour(185);
+    this.setTooltip("Number of objects of this label currently detected");
+  },
+};
+
+Blockly.Blocks["turtle_get_x"] = {
+  init() {
+    this.appendDummyInput()
+      .appendField(turtleField(), "TURTLE")
+      .appendField("x");
+    this.setOutput(true, "Number");
+    this.setColour(MOVE_COLOR);
+    this.setTooltip("Current x position of the turtle");
+  },
+};
+
+Blockly.Blocks["turtle_get_y"] = {
+  init() {
+    this.appendDummyInput()
+      .appendField(turtleField(), "TURTLE")
+      .appendField("y");
+    this.setOutput(true, "Number");
+    this.setColour(MOVE_COLOR);
+    this.setTooltip("Current y position of the turtle");
+  },
+};
+
 // ── JavaScript code generators ────────────────────────────────────────────
 
 function turtleName(block, gen) {
@@ -410,7 +601,13 @@ function turtleName(block, gen) {
 
 javascriptGenerator.forBlock["turtle_create"] = (block, gen) => {
   const name = gen.getVariableName(block.getFieldValue("TURTLE"));
-  return `const ${name} = new Turtle();\n`;
+  const z = Number(block.getFieldValue("ZLAYER") ?? 0);
+  return z === 0 ? `const ${name} = new Turtle();\n` : `const ${name} = new Turtle(${z});\n`;
+};
+
+javascriptGenerator.forBlock["turtle_set_layer"] = (block, gen) => {
+  const z = Number(block.getFieldValue("ZLAYER") ?? 0);
+  return `${turtleName(block, gen)}.z(${z});\n`;
 };
 
 javascriptGenerator.forBlock["turtle_forward"] = (block, gen) => {
@@ -424,12 +621,12 @@ javascriptGenerator.forBlock["turtle_backward"] = (block, gen) => {
 };
 
 javascriptGenerator.forBlock["turtle_right"] = (block, gen) => {
-  const deg = block.getFieldValue("DEGREES") ?? 90;
+  const deg = gen.valueToCode(block, "DEGREES", Order.NONE) || "90";
   return `${turtleName(block, gen)}.right(${deg});\n`;
 };
 
 javascriptGenerator.forBlock["turtle_left"] = (block, gen) => {
-  const deg = block.getFieldValue("DEGREES") ?? 90;
+  const deg = gen.valueToCode(block, "DEGREES", Order.NONE) || "90";
   return `${turtleName(block, gen)}.left(${deg});\n`;
 };
 
@@ -465,6 +662,11 @@ javascriptGenerator.forBlock["turtle_repeat"] = (block, gen) => {
   return `${turtleName(block, gen)}.repeat(${count}, () => {\n${branch}});\n`;
 };
 
+javascriptGenerator.forBlock["turtle_forever"] = (block, gen) => {
+  const branch = gen.statementToCode(block, "DO");
+  return `${turtleName(block, gen)}.forever(() => {\n${branch}});\n`;
+};
+
 javascriptGenerator.forBlock["turtle_wait"] = (block, gen) => {
   const secs = gen.valueToCode(block, "SECONDS", Order.NONE) || "1";
   return `${turtleName(block, gen)}.wait(${secs});\n`;
@@ -483,7 +685,7 @@ javascriptGenerator.forBlock["timer_set_timeout"] = (block, gen) => {
 };
 
 javascriptGenerator.forBlock["color_random"] = () =>
-  [`\`hsl(\${Math.floor(Math.random()*360)},\${50+Math.floor(Math.random()*50)}%,\${40+Math.floor(Math.random()*30)}%)\``, Order.ATOMIC];
+  [`Color.random()`, Order.ATOMIC];
 
 javascriptGenerator.forBlock["console_log"] = (block, gen) => {
   const val = gen.valueToCode(block, "VALUE", Order.NONE) || '""';
@@ -510,22 +712,20 @@ javascriptGenerator.forBlock["event_on_start"] = (block, gen) => {
 javascriptGenerator.forBlock["event_on_key"] = (block, gen) => {
   const key = block.getFieldValue("KEY");
   const inner = genNextChain(gen, block);
-  if (key === "__any__") {
-    return `window.__ar_canvasEl.addEventListener('keydown', function(__e) {\n${inner}});\n`;
-  }
-  return `window.__ar_canvasEl.addEventListener('keydown', function(__e) {\nif (__e.key === ${JSON.stringify(key)}) {\n${inner}}\n});\n`;
+  const k = key === "__any__" ? "any" : key;
+  return `onKey(${JSON.stringify(k)}, function(__e) {\n${inner}});\n`;
 };
 
 javascriptGenerator.forBlock["event_on_gesture"] = (block, gen) => {
   const gesture = block.getFieldValue("GESTURE");
   const inner = genNextChain(gen, block);
-  return `(function() {\n  var _prev = false;\n  setInterval(function() {\n    var _curr = vision.gesture() === ${JSON.stringify(gesture)};\n    if (_curr && !_prev) {\n${inner}    }\n    _prev = _curr;\n  }, 100);\n})();\n`;
+  return `vision.onGesture(${JSON.stringify(gesture)}, function() {\n${inner}});\n`;
 };
 
 javascriptGenerator.forBlock["event_on_expression"] = (block, gen) => {
   const expr = block.getFieldValue("EXPRESSION");
   const inner = genNextChain(gen, block);
-  return `(function() {\n  var _prev = false;\n  setInterval(function() {\n    var _curr = vision.expression() === ${JSON.stringify(expr)};\n    if (_curr && !_prev) {\n${inner}    }\n    _prev = _curr;\n  }, 100);\n})();\n`;
+  return `vision.onExpression(${JSON.stringify(expr)}, function() {\n${inner}});\n`;
 };
 
 javascriptGenerator.forBlock["event_on_edge"] = (block, gen) => {
@@ -539,6 +739,73 @@ javascriptGenerator.forBlock["event_on_collide"] = (block, gen) => {
   const dist = gen.valueToCode(block, "DIST", Order.NONE) || "20";
   const inner = genNextChain(gen, block);
   return `${t1}.onCollide(${t2}, ${dist}, function() {\n${inner}});\n`;
+};
+
+javascriptGenerator.forBlock["turtle_xy"] = (block, gen) => {
+  const x = gen.valueToCode(block, "X", Order.NONE) || "0";
+  const y = gen.valueToCode(block, "Y", Order.NONE) || "0";
+  return `${turtleName(block, gen)}.xy(${x}, ${y});\n`;
+};
+
+javascriptGenerator.forBlock["turtle_heading"] = (block, gen) => {
+  const deg = block.getFieldValue("DEGREES");
+  return `${turtleName(block, gen)}.heading(${deg});\n`;
+};
+
+javascriptGenerator.forBlock["turtle_face"] = (block, gen) => {
+  const x = gen.valueToCode(block, "X", Order.NONE) || "0";
+  const y = gen.valueToCode(block, "Y", Order.NONE) || "0";
+  return `${turtleName(block, gen)}.face(${x}, ${y});\n`;
+};
+
+javascriptGenerator.forBlock["turtle_arc"] = (block, gen) => {
+  const r = gen.valueToCode(block, "RADIUS", Order.NONE) || "0";
+  const d = gen.valueToCode(block, "DEGREES", Order.NONE) || "0";
+  return `${turtleName(block, gen)}.arc(${r}, ${d});\n`;
+};
+
+javascriptGenerator.forBlock["turtle_seek"] = (block, gen) => {
+  const obj = gen.valueToCode(block, "OBJ", Order.NONE) || "null";
+  const step = gen.valueToCode(block, "STEP", Order.NONE) || "10";
+  return `${turtleName(block, gen)}.seek(${obj}, ${step});\n`;
+};
+
+javascriptGenerator.forBlock["turtle_goto"] = (block, gen) => {
+  const obj = gen.valueToCode(block, "OBJ", Order.NONE) || "null";
+  return `${turtleName(block, gen)}.goTo(${obj});\n`;
+};
+
+javascriptGenerator.forBlock["turtle_reset"] = (block, gen) => {
+  return `${turtleName(block, gen)}.reset();\n`;
+};
+
+javascriptGenerator.forBlock["turtle_rand_uni"] = (block, gen) => {
+  const lo = gen.valueToCode(block, "LO", Order.NONE) || "0";
+  const hi = gen.valueToCode(block, "HI", Order.NONE) || "100";
+  return [`randUni(${lo}, ${hi})`, Order.FUNCTION_CALL];
+};
+
+javascriptGenerator.forBlock["vision_nearest"] = (block) => {
+  const label = block.getFieldValue("LABEL");
+  return [`vision.nearest(${JSON.stringify(label)})`, Order.FUNCTION_CALL];
+};
+
+javascriptGenerator.forBlock["vision_any"] = (block) => {
+  const label = block.getFieldValue("LABEL");
+  return [`vision.any(${JSON.stringify(label)})`, Order.FUNCTION_CALL];
+};
+
+javascriptGenerator.forBlock["vision_count"] = (block) => {
+  const label = block.getFieldValue("LABEL");
+  return [`vision.count(${JSON.stringify(label)})`, Order.FUNCTION_CALL];
+};
+
+javascriptGenerator.forBlock["turtle_get_x"] = (block, gen) => {
+  return [`${turtleName(block, gen)}.get.x()`, Order.FUNCTION_CALL];
+};
+
+javascriptGenerator.forBlock["turtle_get_y"] = (block, gen) => {
+  return [`${turtleName(block, gen)}.get.y()`, Order.FUNCTION_CALL];
 };
 
 // ── Toolbox definition ────────────────────────────────────────────────────
@@ -569,6 +836,8 @@ export const TOOLBOX = {
       colour: String(TURTLE_COLOR),
       contents: [
         { kind: "block", type: "turtle_create" },
+        { kind: "block", type: "turtle_set_layer" },
+        { kind: "block", type: "turtle_reset" },
       ],
     },
     {
@@ -586,6 +855,9 @@ export const TOOLBOX = {
           type: "turtle_backward",
           inputs: { AMOUNT: { shadow: { type: "math_number", fields: { NUM: 50 } } } },
         },
+        { kind: "block", type: "turtle_xy", inputs: { X: { shadow: { type: "math_number", fields: { NUM: 0 } } }, Y: { shadow: { type: "math_number", fields: { NUM: 0 } } } } },
+        { kind: "block", type: "turtle_get_x" },
+        { kind: "block", type: "turtle_get_y" },
         { kind: "block", type: "turtle_home" },
         { kind: "block", type: "turtle_clear" },
         { kind: "block", type: "turtle_clean" },
@@ -596,8 +868,10 @@ export const TOOLBOX = {
       name: "Turn",
       colour: String(TURN_COLOR),
       contents: [
-        { kind: "block", type: "turtle_right" },
-        { kind: "block", type: "turtle_left" },
+        { kind: "block", type: "turtle_right", inputs: { DEGREES: { shadow: { type: "math_number", fields: { NUM: 90 } } } } },
+        { kind: "block", type: "turtle_left", inputs: { DEGREES: { shadow: { type: "math_number", fields: { NUM: 90 } } } } },
+        { kind: "block", type: "turtle_heading" },
+        { kind: "block", type: "turtle_face", inputs: { X: { shadow: { type: "math_number", fields: { NUM: 0 } } }, Y: { shadow: { type: "math_number", fields: { NUM: 0 } } } } },
       ],
     },
     {
@@ -631,6 +905,7 @@ export const TOOLBOX = {
           type: "turtle_circle",
           inputs: { RADIUS: { shadow: { type: "math_number", fields: { NUM: 20 } } } },
         },
+        { kind: "block", type: "turtle_arc", inputs: { RADIUS: { shadow: { type: "math_number", fields: { NUM: 50 } } }, DEGREES: { shadow: { type: "math_number", fields: { NUM: 90 } } } } },
       ],
     },
     {
@@ -643,6 +918,7 @@ export const TOOLBOX = {
           type: "turtle_repeat",
           inputs: { COUNT: { shadow: { type: "math_number", fields: { NUM: 4 } } } },
         },
+        { kind: "block", type: "turtle_forever" },
         {
           kind: "block",
           type: "turtle_wait",
@@ -662,6 +938,29 @@ export const TOOLBOX = {
           kind: "block",
           type: "console_log",
           inputs: { VALUE: { shadow: { type: "text", fields: { TEXT: "hello" } } } },
+        },
+      ],
+    },
+    {
+      kind: "category",
+      name: "Vision",
+      colour: "185",
+      contents: [
+        { kind: "block", type: "vision_nearest", fields: { LABEL: "person" } },
+        { kind: "block", type: "vision_any", fields: { LABEL: "person" } },
+        { kind: "block", type: "vision_count", fields: { LABEL: "person" } },
+        {
+          kind: "block",
+          type: "turtle_seek",
+          inputs: {
+            OBJ: { shadow: { type: "vision_nearest", fields: { LABEL: "person" } } },
+            STEP: { shadow: { type: "math_number", fields: { NUM: 10 } } },
+          },
+        },
+        {
+          kind: "block",
+          type: "turtle_goto",
+          inputs: { OBJ: { shadow: { type: "vision_nearest", fields: { LABEL: "person" } } } },
         },
       ],
     },
@@ -739,6 +1038,7 @@ export const TOOLBOX = {
         { kind: "block", type: "math_constrain" },
         { kind: "block", type: "math_random_int" },
         { kind: "block", type: "math_random_float" },
+        { kind: "block", type: "turtle_rand_uni", inputs: { LO: { shadow: { type: "math_number", fields: { NUM: 0 } } }, HI: { shadow: { type: "math_number", fields: { NUM: 100 } } } } },
       ],
     },
     {

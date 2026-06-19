@@ -28,6 +28,9 @@ function classifyExpression(blendshapes) {
 
 const _cache = { objects: [], hands: [], face: null };
 
+const _gestureHandlers = [];   // [{gesture, fn, prev}]
+const _expressionHandlers = []; // [{expr, fn, prev}]
+
 let _initPromise = null;
 let _ready = false;
 let _running = false;
@@ -144,6 +147,23 @@ function _loop() {
       }
     }
   } catch (_) {}
+
+  // Edge-triggered gesture handlers
+  const g = _cache.hands[0]?.gesture;
+  const currGesture = (!g || g === 'None') ? null : g;
+  for (const h of _gestureHandlers) {
+    const active = currGesture === h.gesture;
+    if (active && !h.prev) h.fn();
+    h.prev = active;
+  }
+
+  // Edge-triggered expression handlers
+  const currExpr = _cache.face?.expression ?? null;
+  for (const h of _expressionHandlers) {
+    const active = currExpr === h.expr;
+    if (active && !h.prev) h.fn();
+    h.prev = active;
+  }
 }
 
 function _ensureStarted() {
@@ -167,6 +187,8 @@ export function stopVision() {
   _cache.hands = [];
   _cache.face = null;
   _lastDetectionTime = 0;
+  _gestureHandlers.length = 0;
+  _expressionHandlers.length = 0;
 }
 
 export const vision = {
@@ -191,4 +213,13 @@ export const vision = {
 
   face()           { _ensureStarted(); return _cache.face; },
   expression()     { _ensureStarted(); return _cache.face?.expression ?? null; },
+
+  onGesture(gesture, fn) {
+    _ensureStarted();
+    _gestureHandlers.push({ gesture, fn, prev: false });
+  },
+  onExpression(expr, fn) {
+    _ensureStarted();
+    _expressionHandlers.push({ expr, fn, prev: false });
+  },
 };

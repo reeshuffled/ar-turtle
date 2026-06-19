@@ -35,7 +35,8 @@ describe('Turtle', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     canvas = createCanvas(600, 600);
-    turtle = new Turtle(canvas);
+    window.__ar_getLayerCanvas = () => canvas;
+    turtle = new Turtle();
     // Advance far enough that all init queue items (clean/home/pd, each on
     // a 0ms follow-up timer) are fully processed, not just the first 200ms tick.
     vi.advanceTimersByTime(500);

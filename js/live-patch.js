@@ -57,7 +57,14 @@ export function friendlyError(raw) {
   if (dup) return `'${dup[1]}' is declared twice — remove the duplicate const/let/var line.`;
 
   const notFn = m.match(/['"]([\w.]+)['"] is not a function|(\S+) is not a function/);
-  if (notFn) return `${notFn[1] ?? notFn[2]} is not a function — check the spelling.`;
+  if (notFn) {
+    const name = notFn[1] ?? notFn[2];
+    const obj = name.split(".")[0];
+    const hint = /^(turtle|t)\b/.test(obj)
+      ? `did you forget to create it with \`new Turtle()\`?`
+      : `check the spelling.`;
+    return `${name} is not a function — ${hint}`;
+  }
 
   const notDef = m.match(/(\w+) is not defined/);
   if (notDef) return `'${notDef[1]}' is not defined — did you forget to create it?`;

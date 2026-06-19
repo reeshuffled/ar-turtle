@@ -6,11 +6,12 @@ Modernized to ES2022 by the ar-turtle project.
 */
 
 export class Turtle {
-  constructor(canvas = document.getElementById("turtle")) {
-    const ctx = canvas.getContext("2d");
+  constructor(z = 0) {
+    const canvas = window.__ar_getLayerCanvas?.(0) ?? document.getElementById("turtle");
+    let ctx = (window.__ar_getLayerCanvas?.(z) ?? canvas).getContext("2d");
+    ctx.lineCap = "round";
     const canvasWidth = canvas.width;
     const canvasHeight = canvas.height;
-    ctx.lineCap = "round";
 
     const DEFAULT_FG = "#000";
     const DEFAULT_BG = "#fff";
@@ -46,11 +47,13 @@ export class Turtle {
     let queueActive = false;
     let activeLoops = 0;
     let nextDelay = 0;
+    let paused = false;
+    let restartQueue;
     const q = (() => {
       const funs = [];
       let at = 0;
       const run = () => {
-        if (stopped) return;
+        if (stopped || paused) return;
         const len = funs.length - at;
         if (len > 0) {
           queueActive = true;
@@ -74,6 +77,7 @@ export class Turtle {
           setTimeout(run, 200);
         }
       };
+      restartQueue = () => { if (!queueActive && !stopped) run(); };
       run();
       return (fn) => {
         funs.push(fn);
@@ -83,9 +87,10 @@ export class Turtle {
 
     // ── Low-level draw ───────────────────────────────────────────────────────
     // Caches strokeStyle/lineWidth to skip redundant ctx assignments.
+    // resetCache() must be called when ctx changes (turtle.z()).
     const go = (() => {
       let oldX, oldY, oldFg, oldWidth;
-      return (args) => {
+      const fn = (args) => {
         ctx.beginPath();
         if (args.fg !== oldFg) {
           ctx.strokeStyle = args.fg;
@@ -102,6 +107,8 @@ export class Turtle {
         oldY = args.y;
         trigger("move", args);
       };
+      fn.resetCache = () => { oldFg = oldWidth = undefined; };
+      return fn;
     })();
 
     const moveTo = (x, y) => {
@@ -287,6 +294,15 @@ export class Turtle {
       return this.color(DEFAULT_FG).thickness(DEFAULT_WIDTH).clear();
     };
 
+    // ── Layer ────────────────────────────────────────────────────────────────
+    this.z = (n) => {
+      const newCanvas = window.__ar_getLayerCanvas?.(n) ?? canvas;
+      ctx = newCanvas.getContext("2d");
+      ctx.lineCap = "round";
+      go.resetCache();
+      return this;
+    };
+
     // ── Sprite ───────────────────────────────────────────────────────────────
     const sprite = document.createElement("span");
     Object.assign(sprite.style, {
@@ -296,7 +312,7 @@ export class Turtle {
       margin: "-21px",
       transformOrigin: "50% 50%",
       position: "absolute",
-      zIndex: "31",
+      zIndex: "1000",
     });
     canvas.parentElement?.appendChild(sprite);
 
@@ -327,6 +343,9 @@ export class Turtle {
       ro.disconnect();
     };
 
+    this.pause = () => { paused = true; };
+    this.resume = () => { paused = false; restartQueue(); };
+
     // ── Loopers ──────────────────────────────────────────────────────────────
     this.repeat = (amount, fn) => {
       for (let i = 0; i < amount; i++) {
@@ -341,6 +360,7 @@ export class Turtle {
       let i = 0;
       const tick = () => {
         if (stopped) { activeLoops--; return; }
+        if (paused) { setTimeout(tick, 50); return; }
         const result = fn.call(this, i++);
         if (!result && result !== undefined) { activeLoops--; return; }
         setTimeout(tick, 0);

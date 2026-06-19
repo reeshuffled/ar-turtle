@@ -12,11 +12,12 @@ export function textToBlocks(code, workspace) {
     return false;
   }
 
-  // Find turtle variable name
+  // Find turtle variable name and z-index
   let varName = null;
+  let turtleZ = 0;
   for (const node of ast.body) {
-    varName = findTurtleVarName(node);
-    if (varName) break;
+    const found = findTurtleVarName(node);
+    if (found) { varName = found.name; turtleZ = found.z; break; }
   }
   if (!varName) return false;
 
@@ -32,19 +33,20 @@ export function textToBlocks(code, workspace) {
   // Create turtle_create block for the declaration.
   const createBlock = workspace.newBlock("turtle_create");
   createBlock.getField("TURTLE").setValue(turtleVar.getId());
+  createBlock.setFieldValue(String(turtleZ), "ZLAYER");
   createBlock.initSvg();
   createBlock.render();
 
   // Walk top-level statements, building a chain of blocks (skip the declaration).
   const topBlocks = [createBlock];
   for (const node of ast.body) {
-    if (findTurtleVarName(node) === varName) continue;
+    if (findTurtleVarName(node)?.name === varName) continue;
     const blocks = stmtToBlocks(node, varName, turtleVar, workspace);
     topBlocks.push(...blocks);
   }
 
   // If no event hat blocks exist, prepend event_on_start.
-  const eventTypes = ["event_on_start", "event_on_key", "event_on_edge", "event_on_collide"];
+  const eventTypes = ["event_on_start", "event_on_key", "event_on_edge", "event_on_collide", "event_on_gesture", "event_on_expression"];
   const hasEventBlock = eventTypes.some((t) => workspace.getBlocksByType(t, false).length > 0);
   if (!hasEventBlock) {
     const hat = workspace.newBlock("event_on_start");
@@ -61,11 +63,26 @@ export function textToBlocks(code, workspace) {
     if (next && prev) next.connect(prev);
   }
 
+  // Side chains for onEdge/onCollide — hat blocks placed separately
+  let sideX = 350;
+  for (const node of ast.body) {
+    if (findTurtleVarName(node)?.name === varName) continue;
+    const chain = makeSideChain(node, varName, turtleVar, workspace);
+    if (!chain || chain.length === 0) continue;
+    chain[0].moveBy(sideX, 40);
+    for (let i = 0; i < chain.length - 1; i++) {
+      const next = chain[i].nextConnection;
+      const prev = chain[i + 1].previousConnection;
+      if (next && prev) next.connect(prev);
+    }
+    sideX += 260;
+  }
+
   return topBlocks.length > 0;
 }
 
 function findTurtleVarName(node) {
-  // const/let/var X = new Turtle()
+  // const/let/var X = new Turtle() or new Turtle(z)
   if (node.type === "VariableDeclaration" && node.declarations.length > 0) {
     for (const decl of node.declarations) {
       if (
@@ -74,7 +91,15 @@ function findTurtleVarName(node) {
         decl.init.callee.type === "Identifier" &&
         decl.init.callee.name === "Turtle"
       ) {
-        return decl.id.name;
+        const zArg = decl.init.arguments[0];
+        let z = 0;
+        if (zArg?.type === "Literal" && typeof zArg.value === "number") {
+          z = zArg.value;
+        } else if (zArg?.type === "UnaryExpression" && zArg.operator === "-") {
+          const inner = zArg.argument;
+          if (inner?.type === "Literal" && typeof inner.value === "number") z = -inner.value;
+        }
+        return { name: decl.id.name, z };
       }
     }
   }
@@ -116,9 +141,9 @@ function makeMethodBlock(method, args, varName, turtleVar, workspace) {
     case "backward":
       return makeNumBlock("turtle_backward", "AMOUNT", numVal(args[0]), turtleVar, workspace);
     case "right":
-      return makeAngleBlock("turtle_right", numVal(args[0]), turtleVar, workspace);
+      return makeNumBlock("turtle_right", "DEGREES", numVal(args[0]) ?? 90, turtleVar, workspace);
     case "left":
-      return makeAngleBlock("turtle_left", numVal(args[0]), turtleVar, workspace);
+      return makeNumBlock("turtle_left", "DEGREES", numVal(args[0]) ?? 90, turtleVar, workspace);
     case "disc":
       return makeNumBlock("turtle_disc", "RADIUS", numVal(args[0]), turtleVar, workspace);
     case "circle":
@@ -139,6 +164,30 @@ function makeMethodBlock(method, args, varName, turtleVar, workspace) {
       return makeColorBlock(args[0], turtleVar, workspace);
     case "repeat":
       return makeRepeatBlock(args, varName, turtleVar, workspace);
+    case "forever":
+      return makeForeverBlock(args, varName, turtleVar, workspace);
+    case "wait":
+      return makeNumBlock("turtle_wait", "SECONDS", numVal(args[0]), turtleVar, workspace);
+    case "xy":
+      return makeXYBlock("turtle_xy", args, turtleVar, workspace);
+    case "heading": {
+      const block = workspace.newBlock("turtle_heading");
+      setTurtleField(block, turtleVar);
+      const v = numVal(args[0]);
+      if (v !== null) block.setFieldValue(String(v), "DEGREES");
+      block.initSvg(); block.render();
+      return block;
+    }
+    case "face":
+      return makeXYBlock("turtle_face", args, turtleVar, workspace);
+    case "arc":
+      return makeArcBlock(args, turtleVar, workspace);
+    case "seek":
+      return makeSeekBlock(args, turtleVar, workspace);
+    case "goTo":
+      return makeGotoBlock(args, turtleVar, workspace);
+    case "reset":
+      return makeSimpleBlock("turtle_reset", turtleVar, workspace);
     default:
       return null;
   }
@@ -268,6 +317,124 @@ function makeRepeatBlock(args, varName, turtleVar, workspace) {
   block.initSvg();
   block.render();
   return block;
+}
+
+function makeForeverBlock(args, varName, turtleVar, workspace) {
+  const block = workspace.newBlock("turtle_forever");
+  setTurtleField(block, turtleVar);
+  const bodyFn = args[0];
+  if (bodyFn) {
+    const bodyStmts = getFunctionBody(bodyFn);
+    const innerBlocks = [];
+    for (const stmt of bodyStmts) {
+      const bs = stmtToBlocks(stmt, varName, turtleVar, workspace);
+      innerBlocks.push(...bs);
+    }
+    if (innerBlocks.length > 0) {
+      for (let i = 0; i < innerBlocks.length - 1; i++) {
+        const next = innerBlocks[i].nextConnection;
+        const prev = innerBlocks[i + 1].previousConnection;
+        if (next && prev) next.connect(prev);
+      }
+      block.getInput("DO")?.connection?.connect(innerBlocks[0].previousConnection);
+    }
+  }
+  block.initSvg();
+  block.render();
+  return block;
+}
+
+function makeXYBlock(type, args, turtleVar, workspace) {
+  const block = workspace.newBlock(type);
+  setTurtleField(block, turtleVar);
+  const xVal = numVal(args[0]);
+  const yVal = numVal(args[1]);
+  for (const [input, val] of [["X", xVal], ["Y", yVal]]) {
+    if (val !== null) {
+      const s = workspace.newBlock("math_number");
+      s.setFieldValue(String(val), "NUM");
+      s.setShadow(true); s.initSvg(); s.render();
+      block.getInput(input)?.connection?.connect(s.outputConnection);
+    }
+  }
+  block.initSvg(); block.render();
+  return block;
+}
+
+function makeArcBlock(args, turtleVar, workspace) {
+  const block = workspace.newBlock("turtle_arc");
+  setTurtleField(block, turtleVar);
+  for (const [input, idx] of [["RADIUS", 0], ["DEGREES", 1]]) {
+    const val = numVal(args[idx]);
+    if (val !== null) {
+      const s = workspace.newBlock("math_number");
+      s.setFieldValue(String(val), "NUM");
+      s.setShadow(true); s.initSvg(); s.render();
+      block.getInput(input)?.connection?.connect(s.outputConnection);
+    }
+  }
+  block.initSvg(); block.render();
+  return block;
+}
+
+function makeSeekBlock(args, turtleVar, workspace) {
+  const block = workspace.newBlock("turtle_seek");
+  setTurtleField(block, turtleVar);
+  const stepVal = numVal(args[1]);
+  if (stepVal !== null) {
+    const s = workspace.newBlock("math_number");
+    s.setFieldValue(String(stepVal), "NUM");
+    s.setShadow(true); s.initSvg(); s.render();
+    block.getInput("STEP")?.connection?.connect(s.outputConnection);
+  }
+  block.initSvg(); block.render();
+  return block;
+}
+
+function makeGotoBlock(args, turtleVar, workspace) {
+  const block = workspace.newBlock("turtle_goto");
+  setTurtleField(block, turtleVar);
+  block.initSvg(); block.render();
+  return block;
+}
+
+function makeSideChain(node, varName, turtleVar, workspace) {
+  if (node.type !== "ExpressionStatement") return null;
+  const expr = node.expression;
+  if (expr.type !== "CallExpression") return null;
+  const callee = expr.callee;
+  if (callee.type !== "MemberExpression") return null;
+  if (callee.object?.type !== "Identifier" || callee.object.name !== varName) return null;
+
+  const method = callee.property.name;
+  const args = expr.arguments;
+
+  if (method === "onEdge") {
+    const hat = workspace.newBlock("event_on_edge");
+    setTurtleField(hat, turtleVar);
+    hat.initSvg(); hat.render();
+    const bodyStmts = getFunctionBody(args[0]);
+    const inner = bodyStmts.flatMap(s => stmtToBlocks(s, varName, turtleVar, workspace));
+    return [hat, ...inner];
+  }
+
+  if (method === "onCollide") {
+    const hat = workspace.newBlock("event_on_collide");
+    setTurtleField(hat, turtleVar);
+    const distVal = numVal(args[1]);
+    if (distVal !== null) {
+      const s = workspace.newBlock("math_number");
+      s.setFieldValue(String(distVal), "NUM");
+      s.setShadow(true); s.initSvg(); s.render();
+      hat.getInput("DIST")?.connection?.connect(s.outputConnection);
+    }
+    hat.initSvg(); hat.render();
+    const bodyStmts = getFunctionBody(args[2]);
+    const inner = bodyStmts.flatMap(s => stmtToBlocks(s, varName, turtleVar, workspace));
+    return [hat, ...inner];
+  }
+
+  return null;
 }
 
 function getFunctionBody(node) {
