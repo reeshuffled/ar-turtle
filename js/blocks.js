@@ -5,8 +5,6 @@ import { FieldAngle } from "@blockly/field-angle";
 import { FieldSlider } from "@blockly/field-slider";
 import "blockly/blocks";
 
-// ── Block definitions ─────────────────────────────────────────────────────
-
 const MOVE_COLOR = 160;
 const TURN_COLOR = 200;
 const PEN_COLOR = 43;
@@ -19,6 +17,80 @@ const LAYER_COLOR = 300;
 function turtleField() {
   return new Blockly.FieldVariable("turtle", null, ["Turtle"], "Turtle");
 }
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+
+function turtleName(block, gen) {
+  return gen.getVariableName(block.getFieldValue("TURTLE"));
+}
+
+const layerExpr = (block, gen) => `${turtleName(block, gen)}.getLayer()`;
+
+// ── Block factories ───────────────────────────────────────────────────────
+
+function defineTurtleStmt(type, label, colour, tooltip, method) {
+  Blockly.Blocks[type] = {
+    init() {
+      this.appendDummyInput().appendField(turtleField(), "TURTLE").appendField(label);
+      this.setPreviousStatement(true);
+      this.setNextStatement(true);
+      this.setColour(colour);
+      this.setTooltip(tooltip);
+    },
+  };
+  javascriptGenerator.forBlock[type] = (block, gen) => `${turtleName(block, gen)}.${method}();\n`;
+}
+
+function defineLayerFieldBlock(type, label, makeField, fieldName, tooltip, method) {
+  Blockly.Blocks[type] = {
+    init() {
+      this.appendDummyInput()
+        .appendField(turtleField(), "TURTLE")
+        .appendField(label)
+        .appendField(makeField(), fieldName);
+      this.setPreviousStatement(true);
+      this.setNextStatement(true);
+      this.setColour(LAYER_COLOR);
+      this.setTooltip(tooltip);
+    },
+  };
+  javascriptGenerator.forBlock[type] = (block, gen) =>
+    `${layerExpr(block, gen)}.${method}(${block.getFieldValue(fieldName)});\n`;
+}
+
+function defineLayerValueBlock(type, label, inputName, check, fallback, tooltip, method) {
+  Blockly.Blocks[type] = {
+    init() {
+      this.appendValueInput(inputName)
+        .setCheck(check)
+        .appendField(turtleField(), "TURTLE")
+        .appendField(label);
+      this.setPreviousStatement(true);
+      this.setNextStatement(true);
+      this.setColour(LAYER_COLOR);
+      this.setTooltip(tooltip);
+    },
+  };
+  javascriptGenerator.forBlock[type] = (block, gen) => {
+    const val = gen.valueToCode(block, inputName, Order.NONE) || fallback;
+    return `${layerExpr(block, gen)}.${method}(${val});\n`;
+  };
+}
+
+function defineLayerStmt(type, label, tooltip, method) {
+  Blockly.Blocks[type] = {
+    init() {
+      this.appendDummyInput().appendField(turtleField(), "TURTLE").appendField(label);
+      this.setPreviousStatement(true);
+      this.setNextStatement(true);
+      this.setColour(LAYER_COLOR);
+      this.setTooltip(tooltip);
+    },
+  };
+  javascriptGenerator.forBlock[type] = (block, gen) => `${layerExpr(block, gen)}.${method}();\n`;
+}
+
+// ── Block definitions ─────────────────────────────────────────────────────
 
 Blockly.Blocks["turtle_create"] = {
   init() {
@@ -101,25 +173,12 @@ Blockly.Blocks["turtle_left"] = {
   },
 };
 
-Blockly.Blocks["turtle_pen_up"] = {
-  init() {
-    this.appendDummyInput().appendField(turtleField(), "TURTLE").appendField("pen up");
-    this.setPreviousStatement(true);
-    this.setNextStatement(true);
-    this.setColour(PEN_COLOR);
-    this.setTooltip("Lift the pen — turtle moves without drawing");
-  },
-};
-
-Blockly.Blocks["turtle_pen_down"] = {
-  init() {
-    this.appendDummyInput().appendField(turtleField(), "TURTLE").appendField("pen down");
-    this.setPreviousStatement(true);
-    this.setNextStatement(true);
-    this.setColour(PEN_COLOR);
-    this.setTooltip("Lower the pen — turtle draws lines while moving");
-  },
-};
+defineTurtleStmt("turtle_pen_up",  "pen up",  PEN_COLOR,    "Lift the pen — turtle moves without drawing",            "pu");
+defineTurtleStmt("turtle_pen_down", "pen down", PEN_COLOR,  "Lower the pen — turtle draws lines while moving",        "pd");
+defineTurtleStmt("turtle_home",    "home",    MOVE_COLOR,   "Return to center and reset heading to 0°",               "home");
+defineTurtleStmt("turtle_clear",   "clear",   MOVE_COLOR,   "Fill background, go home, and put pen down",             "clear");
+defineTurtleStmt("turtle_clean",   "clean",   MOVE_COLOR,   "Fill the background with color (keeps current position)", "clean");
+defineTurtleStmt("turtle_reset",   "reset",   TURTLE_COLOR, "Full reset: transparent background, white pen, clear",   "reset");
 
 Blockly.Blocks["turtle_color"] = {
   init() {
@@ -173,36 +232,6 @@ Blockly.Blocks["turtle_circle"] = {
   },
 };
 
-Blockly.Blocks["turtle_home"] = {
-  init() {
-    this.appendDummyInput().appendField(turtleField(), "TURTLE").appendField("home");
-    this.setPreviousStatement(true);
-    this.setNextStatement(true);
-    this.setColour(MOVE_COLOR);
-    this.setTooltip("Return to center and reset heading to 0°");
-  },
-};
-
-Blockly.Blocks["turtle_clear"] = {
-  init() {
-    this.appendDummyInput().appendField(turtleField(), "TURTLE").appendField("clear");
-    this.setPreviousStatement(true);
-    this.setNextStatement(true);
-    this.setColour(MOVE_COLOR);
-    this.setTooltip("Fill background, go home, and put pen down");
-  },
-};
-
-Blockly.Blocks["turtle_clean"] = {
-  init() {
-    this.appendDummyInput().appendField(turtleField(), "TURTLE").appendField("clean");
-    this.setPreviousStatement(true);
-    this.setNextStatement(true);
-    this.setColour(MOVE_COLOR);
-    this.setTooltip("Fill the background with color (keeps current position)");
-  },
-};
-
 Blockly.Blocks["colour_picker"] = {
   init() {
     this.appendDummyInput().appendField(new FieldColour("#ff0000"), "COLOUR");
@@ -210,11 +239,6 @@ Blockly.Blocks["colour_picker"] = {
     this.setColour(PEN_COLOR);
     this.setTooltip("Pick a color");
   },
-};
-
-javascriptGenerator.forBlock["colour_picker"] = (block) => {
-  const c = block.getFieldValue("COLOUR") || "#ff0000";
-  return [JSON.stringify(c), Order.ATOMIC];
 };
 
 Blockly.Blocks["color_random"] = {
@@ -533,16 +557,6 @@ Blockly.Blocks["turtle_goto"] = {
   },
 };
 
-Blockly.Blocks["turtle_reset"] = {
-  init() {
-    this.appendDummyInput().appendField(turtleField(), "TURTLE").appendField("reset");
-    this.setPreviousStatement(true);
-    this.setNextStatement(true);
-    this.setColour(TURTLE_COLOR);
-    this.setTooltip("Full reset: transparent background, white pen, clear");
-  },
-};
-
 Blockly.Blocks["turtle_rand_uni"] = {
   init() {
     this.appendValueInput("LO").setCheck("Number").appendField("random");
@@ -626,11 +640,39 @@ Blockly.Blocks["turtle_get_y"] = {
   },
 };
 
-// ── JavaScript code generators ────────────────────────────────────────────
+// ── Layer blocks ──────────────────────────────────────────────────────────
 
-function turtleName(block, gen) {
-  return gen.getVariableName(block.getFieldValue("TURTLE"));
-}
+// prettier-ignore
+defineLayerFieldBlock("layer_blur",       "layer blur",       () => new FieldSlider(5, 0, 40, 1),     "PX",  "Gaussian blur the layer (px)",                  "blur");
+// prettier-ignore
+defineLayerFieldBlock("layer_hue",        "layer hue shift",  () => new FieldAngle(0),                 "DEG", "Shift hue by degrees (0–360)",                  "hue");
+// prettier-ignore
+defineLayerFieldBlock("layer_brightness", "layer brightness", () => new FieldSlider(1.5, 0, 3, 0.1),  "N",   "Adjust brightness (1 = normal, 2 = double)",    "brightness");
+// prettier-ignore
+defineLayerFieldBlock("layer_saturate",   "layer saturate",   () => new FieldSlider(2, 0, 3, 0.1),    "N",   "Adjust saturation (1 = normal, 0 = grayscale)", "saturate");
+// prettier-ignore
+defineLayerFieldBlock("layer_invert",     "layer invert",     () => new FieldSlider(1, 0, 1, 0.1),    "N",   "Invert colors (0–1, 1 = full invert)",          "invert");
+// prettier-ignore
+defineLayerFieldBlock("layer_opacity",    "layer opacity",    () => new FieldSlider(0.5, 0, 1, 0.01), "N",   "Layer opacity (0 = invisible, 1 = full)",       "opacity");
+// prettier-ignore
+defineLayerFieldBlock("layer_rotate",     "layer rotate",     () => new FieldAngle(45),                "DEG", "Rotate the entire layer in degrees",            "rotate");
+
+// prettier-ignore
+defineLayerValueBlock("layer_rotateX",     "layer tilt X",      "DEG", "Number", "30",            "Tilt layer on X axis in degrees (perspective 600px auto-applied)",   "rotateX");
+// prettier-ignore
+defineLayerValueBlock("layer_rotateY",     "layer tilt Y",      "DEG", "Number", "30",            "Tilt layer on Y axis in degrees (perspective 600px auto-applied)",   "rotateY");
+// prettier-ignore
+defineLayerValueBlock("layer_scale",       "layer scale",       "N",   "Number", "1",             "Scale the layer (1 = normal, 2 = double size)",                      "scale");
+// prettier-ignore
+defineLayerValueBlock("layer_perspective", "layer perspective", "PX",  "Number", "600",           "Perspective distance for tilt X/Y (px) — smaller = more dramatic",  "perspective");
+// prettier-ignore
+defineLayerValueBlock("layer_clip",        "layer clip",        "STR", null,     "'circle(50%)'", "Clip layer to a CSS clip-path shape (e.g. 'circle(50%)', 'polygon(50% 0%, 100% 100%, 0% 100%)')", "clip");
+// prettier-ignore
+defineLayerValueBlock("layer_filter_raw",  "layer raw filter",  "STR", null,     "''",            "CSS filter string — overrides named filter methods",                 "filter");
+
+defineLayerStmt("layer_reset", "layer reset effects", "Remove all CSS effects from this turtle's layer", "reset");
+
+// ── JavaScript code generators ────────────────────────────────────────────
 
 javascriptGenerator.forBlock["turtle_create"] = (block, gen) => {
   const name = gen.getVariableName(block.getFieldValue("TURTLE"));
@@ -662,15 +704,6 @@ javascriptGenerator.forBlock["turtle_left"] = (block, gen) => {
   const deg = gen.valueToCode(block, "DEGREES", Order.NONE) || "90";
   return `${turtleName(block, gen)}.left(${deg});\n`;
 };
-
-javascriptGenerator.forBlock["turtle_pen_up"] = (block, gen) => `${turtleName(block, gen)}.pu();\n`;
-javascriptGenerator.forBlock["turtle_pen_down"] = (block, gen) =>
-  `${turtleName(block, gen)}.pd();\n`;
-javascriptGenerator.forBlock["turtle_home"] = (block, gen) => `${turtleName(block, gen)}.home();\n`;
-javascriptGenerator.forBlock["turtle_clear"] = (block, gen) =>
-  `${turtleName(block, gen)}.clear();\n`;
-javascriptGenerator.forBlock["turtle_clean"] = (block, gen) =>
-  `${turtleName(block, gen)}.clean();\n`;
 
 javascriptGenerator.forBlock["turtle_color"] = (block, gen) => {
   const c = gen.valueToCode(block, "COLOR", Order.NONE) || "'#000000'";
@@ -720,6 +753,11 @@ javascriptGenerator.forBlock["timer_set_timeout"] = (block, gen) => {
   return `setTimeout(() => {\n${branch}}, ${delay});\n`;
 };
 
+javascriptGenerator.forBlock["colour_picker"] = (block) => {
+  const c = block.getFieldValue("COLOUR") || "#ff0000";
+  return [JSON.stringify(c), Order.ATOMIC];
+};
+
 javascriptGenerator.forBlock["color_random"] = () => [`Color.random()`, Order.ATOMIC];
 
 javascriptGenerator.forBlock["console_log"] = (block, gen) => {
@@ -744,9 +782,7 @@ const genNextChain = (gen, block) => {
   return next ? gen.blockToCode(next) : "";
 };
 
-javascriptGenerator.forBlock["event_on_start"] = (block, gen) => {
-  return genNextChain(gen, block);
-};
+javascriptGenerator.forBlock["event_on_start"] = (block, gen) => genNextChain(gen, block);
 
 javascriptGenerator.forBlock["event_on_key"] = (block, gen) => {
   const key = block.getFieldValue("KEY");
@@ -814,10 +850,6 @@ javascriptGenerator.forBlock["turtle_goto"] = (block, gen) => {
   return `${turtleName(block, gen)}.goTo(${obj});\n`;
 };
 
-javascriptGenerator.forBlock["turtle_reset"] = (block, gen) => {
-  return `${turtleName(block, gen)}.reset();\n`;
-};
-
 javascriptGenerator.forBlock["turtle_rand_uni"] = (block, gen) => {
   const lo = gen.valueToCode(block, "LO", Order.NONE) || "0";
   const hi = gen.valueToCode(block, "HI", Order.NONE) || "100";
@@ -839,259 +871,25 @@ javascriptGenerator.forBlock["vision_count"] = (block) => {
   return [`vision.count(${JSON.stringify(label)})`, Order.FUNCTION_CALL];
 };
 
-javascriptGenerator.forBlock["turtle_get_x"] = (block, gen) => {
-  return [`${turtleName(block, gen)}.get.x()`, Order.FUNCTION_CALL];
-};
+javascriptGenerator.forBlock["turtle_get_x"] = (block, gen) => [
+  `${turtleName(block, gen)}.get.x()`,
+  Order.FUNCTION_CALL,
+];
 
-javascriptGenerator.forBlock["turtle_get_y"] = (block, gen) => {
-  return [`${turtleName(block, gen)}.get.y()`, Order.FUNCTION_CALL];
-};
+javascriptGenerator.forBlock["turtle_get_y"] = (block, gen) => [
+  `${turtleName(block, gen)}.get.y()`,
+  Order.FUNCTION_CALL,
+];
 
 javascriptGenerator.forBlock["canvas_width"] = (block, gen) => [
   `${turtleName(block, gen)}.getCanvas().width`,
   Order.FUNCTION_CALL,
 ];
+
 javascriptGenerator.forBlock["canvas_height"] = (block, gen) => [
   `${turtleName(block, gen)}.getCanvas().height`,
   Order.FUNCTION_CALL,
 ];
-
-// ── Layer block definitions ───────────────────────────────────────────────
-
-Blockly.Blocks["layer_blur"] = {
-  init() {
-    this.appendDummyInput()
-      .appendField(turtleField(), "TURTLE")
-      .appendField("layer blur")
-      .appendField(new FieldSlider(5, 0, 40, 1), "PX")
-      .appendField("px");
-    this.setPreviousStatement(true);
-    this.setNextStatement(true);
-    this.setColour(LAYER_COLOR);
-    this.setTooltip("Gaussian blur the layer (px)");
-  },
-};
-
-Blockly.Blocks["layer_hue"] = {
-  init() {
-    this.appendDummyInput()
-      .appendField(turtleField(), "TURTLE")
-      .appendField("layer hue shift")
-      .appendField(new FieldAngle(0), "DEG");
-    this.setPreviousStatement(true);
-    this.setNextStatement(true);
-    this.setColour(LAYER_COLOR);
-    this.setTooltip("Shift hue by degrees (0–360)");
-  },
-};
-
-Blockly.Blocks["layer_brightness"] = {
-  init() {
-    this.appendDummyInput()
-      .appendField(turtleField(), "TURTLE")
-      .appendField("layer brightness")
-      .appendField(new FieldSlider(1.5, 0, 3, 0.1), "N");
-    this.setPreviousStatement(true);
-    this.setNextStatement(true);
-    this.setColour(LAYER_COLOR);
-    this.setTooltip("Adjust brightness (1 = normal, 2 = double)");
-  },
-};
-
-Blockly.Blocks["layer_saturate"] = {
-  init() {
-    this.appendDummyInput()
-      .appendField(turtleField(), "TURTLE")
-      .appendField("layer saturate")
-      .appendField(new FieldSlider(2, 0, 3, 0.1), "N");
-    this.setPreviousStatement(true);
-    this.setNextStatement(true);
-    this.setColour(LAYER_COLOR);
-    this.setTooltip("Adjust saturation (1 = normal, 0 = grayscale)");
-  },
-};
-
-Blockly.Blocks["layer_invert"] = {
-  init() {
-    this.appendDummyInput()
-      .appendField(turtleField(), "TURTLE")
-      .appendField("layer invert")
-      .appendField(new FieldSlider(1, 0, 1, 0.1), "N");
-    this.setPreviousStatement(true);
-    this.setNextStatement(true);
-    this.setColour(LAYER_COLOR);
-    this.setTooltip("Invert colors (0–1, 1 = full invert)");
-  },
-};
-
-Blockly.Blocks["layer_opacity"] = {
-  init() {
-    this.appendDummyInput()
-      .appendField(turtleField(), "TURTLE")
-      .appendField("layer opacity")
-      .appendField(new FieldSlider(0.5, 0, 1, 0.01), "N");
-    this.setPreviousStatement(true);
-    this.setNextStatement(true);
-    this.setColour(LAYER_COLOR);
-    this.setTooltip("Layer opacity (0 = invisible, 1 = full)");
-  },
-};
-
-Blockly.Blocks["layer_rotate"] = {
-  init() {
-    this.appendDummyInput()
-      .appendField(turtleField(), "TURTLE")
-      .appendField("layer rotate")
-      .appendField(new FieldAngle(45), "DEG");
-    this.setPreviousStatement(true);
-    this.setNextStatement(true);
-    this.setColour(LAYER_COLOR);
-    this.setTooltip("Rotate the entire layer in degrees");
-  },
-};
-
-Blockly.Blocks["layer_rotateX"] = {
-  init() {
-    this.appendValueInput("DEG")
-      .setCheck("Number")
-      .appendField(turtleField(), "TURTLE")
-      .appendField("layer tilt X");
-    this.setPreviousStatement(true);
-    this.setNextStatement(true);
-    this.setColour(LAYER_COLOR);
-    this.setTooltip("Tilt layer on X axis in degrees (perspective 600px auto-applied)");
-  },
-};
-
-Blockly.Blocks["layer_rotateY"] = {
-  init() {
-    this.appendValueInput("DEG")
-      .setCheck("Number")
-      .appendField(turtleField(), "TURTLE")
-      .appendField("layer tilt Y");
-    this.setPreviousStatement(true);
-    this.setNextStatement(true);
-    this.setColour(LAYER_COLOR);
-    this.setTooltip("Tilt layer on Y axis in degrees (perspective 600px auto-applied)");
-  },
-};
-
-Blockly.Blocks["layer_scale"] = {
-  init() {
-    this.appendValueInput("N")
-      .setCheck("Number")
-      .appendField(turtleField(), "TURTLE")
-      .appendField("layer scale");
-    this.setPreviousStatement(true);
-    this.setNextStatement(true);
-    this.setColour(LAYER_COLOR);
-    this.setTooltip("Scale the layer (1 = normal, 2 = double size)");
-  },
-};
-
-Blockly.Blocks["layer_perspective"] = {
-  init() {
-    this.appendValueInput("PX")
-      .setCheck("Number")
-      .appendField(turtleField(), "TURTLE")
-      .appendField("layer perspective");
-    this.setPreviousStatement(true);
-    this.setNextStatement(true);
-    this.setColour(LAYER_COLOR);
-    this.setTooltip("Perspective distance for tilt X/Y (px) — smaller = more dramatic");
-  },
-};
-
-Blockly.Blocks["layer_clip"] = {
-  init() {
-    this.appendValueInput("STR").appendField(turtleField(), "TURTLE").appendField("layer clip");
-    this.setPreviousStatement(true);
-    this.setNextStatement(true);
-    this.setColour(LAYER_COLOR);
-    this.setTooltip(
-      "Clip layer to a CSS clip-path shape (e.g. 'circle(50%)', 'polygon(50% 0%, 100% 100%, 0% 100%)')",
-    );
-  },
-};
-
-Blockly.Blocks["layer_filter_raw"] = {
-  init() {
-    this.appendValueInput("STR")
-      .appendField(turtleField(), "TURTLE")
-      .appendField("layer raw filter");
-    this.setPreviousStatement(true);
-    this.setNextStatement(true);
-    this.setColour(LAYER_COLOR);
-    this.setTooltip("CSS filter string — overrides named filter methods");
-  },
-};
-
-Blockly.Blocks["layer_reset"] = {
-  init() {
-    this.appendDummyInput().appendField(turtleField(), "TURTLE").appendField("layer reset effects");
-    this.setPreviousStatement(true);
-    this.setNextStatement(true);
-    this.setColour(LAYER_COLOR);
-    this.setTooltip("Remove all CSS effects from this turtle's layer");
-  },
-};
-
-// ── Layer code generators ─────────────────────────────────────────────────
-
-const layerExpr = (block, gen) => `${turtleName(block, gen)}.getLayer()`;
-
-javascriptGenerator.forBlock["layer_blur"] = (block, gen) =>
-  `${layerExpr(block, gen)}.blur(${block.getFieldValue("PX")});\n`;
-
-javascriptGenerator.forBlock["layer_hue"] = (block, gen) =>
-  `${layerExpr(block, gen)}.hue(${block.getFieldValue("DEG")});\n`;
-
-javascriptGenerator.forBlock["layer_brightness"] = (block, gen) =>
-  `${layerExpr(block, gen)}.brightness(${block.getFieldValue("N")});\n`;
-
-javascriptGenerator.forBlock["layer_saturate"] = (block, gen) =>
-  `${layerExpr(block, gen)}.saturate(${block.getFieldValue("N")});\n`;
-
-javascriptGenerator.forBlock["layer_invert"] = (block, gen) =>
-  `${layerExpr(block, gen)}.invert(${block.getFieldValue("N")});\n`;
-
-javascriptGenerator.forBlock["layer_opacity"] = (block, gen) =>
-  `${layerExpr(block, gen)}.opacity(${block.getFieldValue("N")});\n`;
-
-javascriptGenerator.forBlock["layer_rotate"] = (block, gen) =>
-  `${layerExpr(block, gen)}.rotate(${block.getFieldValue("DEG")});\n`;
-
-javascriptGenerator.forBlock["layer_rotateX"] = (block, gen) => {
-  const deg = gen.valueToCode(block, "DEG", Order.NONE) || "30";
-  return `${layerExpr(block, gen)}.rotateX(${deg});\n`;
-};
-
-javascriptGenerator.forBlock["layer_rotateY"] = (block, gen) => {
-  const deg = gen.valueToCode(block, "DEG", Order.NONE) || "30";
-  return `${layerExpr(block, gen)}.rotateY(${deg});\n`;
-};
-
-javascriptGenerator.forBlock["layer_scale"] = (block, gen) => {
-  const n = gen.valueToCode(block, "N", Order.NONE) || "1";
-  return `${layerExpr(block, gen)}.scale(${n});\n`;
-};
-
-javascriptGenerator.forBlock["layer_perspective"] = (block, gen) => {
-  const px = gen.valueToCode(block, "PX", Order.NONE) || "600";
-  return `${layerExpr(block, gen)}.perspective(${px});\n`;
-};
-
-javascriptGenerator.forBlock["layer_clip"] = (block, gen) => {
-  const str = gen.valueToCode(block, "STR", Order.NONE) || "'circle(50%)'";
-  return `${layerExpr(block, gen)}.clip(${str});\n`;
-};
-
-javascriptGenerator.forBlock["layer_filter_raw"] = (block, gen) => {
-  const str = gen.valueToCode(block, "STR", Order.NONE) || "''";
-  return `${layerExpr(block, gen)}.filter(${str});\n`;
-};
-
-javascriptGenerator.forBlock["layer_reset"] = (block, gen) => `${layerExpr(block, gen)}.reset();\n`;
 
 // ── Toolbox definition ────────────────────────────────────────────────────
 

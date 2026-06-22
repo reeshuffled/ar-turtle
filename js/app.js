@@ -10,6 +10,7 @@ import { initCamera } from "./camera.js";
 import { UndoStack } from "./undo-stack.js";
 import { freezeTimers, restoreTimers } from "./timer-manager.js";
 import { computeStepAction } from "./step-controller.js";
+import { initInlineWidgets } from "./inline-widgets.js";
 
 // Capture native timer/event functions before any user-code patching.
 const _nativeSetInterval = window.setInterval.bind(window);
@@ -73,12 +74,16 @@ window.onload = () => {
     mode: "javascript",
     lineNumbers: true,
     value: initialCode,
-    extraKeys: { "Ctrl-Space": "autocomplete" },
+    extraKeys: { "Ctrl-Space": "autocomplete", "Ctrl-Q": (cm) => cm.foldCode(cm.getCursor()) },
+    foldGutter: true,
+    gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"],
     hintOptions: { hint: turtleHint, completeSingle: false },
     matchBrackets: true,
     autoCloseBrackets: true,
     styleActiveLine: true,
   });
+
+  const inlineWidgets = initInlineWidgets(editor);
 
   let saveTimer;
   editor.on("change", () => {
@@ -345,13 +350,13 @@ window.onload = () => {
   const undoStack = new UndoStack(20 * 1024 * 1024); // 20 MB
 
   const ICONS = {
-    play: `<svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" style="display:block"><polygon points="3,1 13,8 3,15"/></svg>`,
-    pause: `<svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" style="display:block"><rect x="2" y="1" width="4" height="14" rx="1"/><rect x="10" y="1" width="4" height="14" rx="1"/></svg>`,
-    stop: `<svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" style="display:block"><rect x="2" y="2" width="12" height="12" rx="2"/></svg>`,
-    reset: `<svg viewBox="0 0 16 16" width="22" height="22" style="display:block"><defs><marker id="reset-arr" markerWidth="4" markerHeight="3" refX="4" refY="1.5" orient="auto" markerUnits="strokeWidth"><polygon points="0,0 4,1.5 0,3" fill="currentColor"/></marker></defs><path d="M14 8A6 6 0 1 1 11 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" marker-end="url(#reset-arr)"/></svg>`,
-    erase: `<svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M1 13L5 4h7l-4 9H1z"/><line x1="4" y1="10" x2="9" y2="10"/><line x1="1" y1="13" x2="15" y2="13"/></svg>`,
-    fullscreen: `<svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><polyline points="1,5 1,1 5,1"/><polyline points="11,1 15,1 15,5"/><polyline points="15,11 15,15 11,15"/><polyline points="5,15 1,15 1,11"/></svg>`,
-    exitFullscreen: `<svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><polyline points="5,1 5,5 1,5"/><polyline points="11,1 11,5 15,5"/><polyline points="11,15 11,11 15,11"/><polyline points="5,15 5,11 1,11"/></svg>`,
+    play: `<i class="fa-solid fa-play"></i>`,
+    pause: `<i class="fa-solid fa-pause"></i>`,
+    stop: `<i class="fa-solid fa-stop"></i>`,
+    reset: `<i class="fa-solid fa-rotate-left"></i>`,
+    erase: `<i class="fa-solid fa-eraser"></i>`,
+    fullscreen: `<i class="fa-solid fa-expand"></i>`,
+    exitFullscreen: `<i class="fa-solid fa-compress"></i>`,
   };
 
   // Patch window.setInterval/clearInterval so we can track active user intervals.
@@ -717,6 +722,7 @@ window.onload = () => {
         } catch (_) {}
       }
     }
+    inlineWidgets.clear();
     toolkitPanel.style.display = "none";
     editorEl.style.display = "none";
     blocklyArea.style.display = "block";
@@ -733,6 +739,7 @@ window.onload = () => {
     editorEl.style.display = "";
     blocklyArea.style.display = "none";
     editor.refresh();
+    inlineWidgets.refresh();
     currentMode = "text";
   }
 
@@ -745,6 +752,7 @@ window.onload = () => {
     editorEl.style.display = "";
     blocklyArea.style.display = "none";
     editor.refresh();
+    inlineWidgets.refresh();
     currentMode = "drag";
   }
 

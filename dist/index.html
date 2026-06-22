@@ -4,12 +4,65 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" />
     <style>
       /* Extra CodeMirror CSS */
       .CodeMirror {
         border-top: 1px solid #888;
         border-bottom: 1px solid #888;
         height: 100%;
+      }
+
+      /* Inline widgets */
+      .ar-widget-color {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        cursor: pointer;
+        vertical-align: middle;
+      }
+      .ar-color-swatch {
+        display: inline-block;
+        width: 11px;
+        height: 11px;
+        border-radius: 2px;
+        border: 1px solid rgba(0, 0, 0, 0.35);
+        flex-shrink: 0;
+        position: relative;
+        top: -1px;
+      }
+      .ar-widget-color:hover .ar-color-swatch {
+        border-color: rgba(0, 0, 0, 0.7);
+        box-shadow: 0 0 0 1px rgba(255,255,255,0.4);
+      }
+      .ar-widget-label {
+        font-family: inherit;
+        font-size: inherit;
+        color: inherit;
+      }
+      .ar-color-picker-input {
+        position: absolute;
+        opacity: 0;
+        width: 0;
+        height: 0;
+        pointer-events: none;
+      }
+      .ar-scrub {
+        cursor: ew-resize;
+        user-select: none;
+        border-bottom: 1.5px dashed rgba(100, 160, 255, 0.7);
+        color: #7ab8ff;
+        font-family: inherit;
+        font-size: inherit;
+        padding: 0 1px;
+      }
+      .ar-scrub:hover {
+        background: rgba(100, 160, 255, 0.12);
+        border-radius: 2px;
+      }
+      .ar-scrub-active {
+        background: rgba(100, 160, 255, 0.22);
+        border-radius: 2px;
       }
       nav ul {
         padding-left: 0;
@@ -254,8 +307,8 @@
         color: red;
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-BxsgUd0o.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-CpIhX3bR.css">
+    <script type="module" crossorigin src="/assets/index-Box-kzcy.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-DzClznGs.css">
   </head>
 
   <body>
@@ -276,25 +329,32 @@
           <select id="cameraSelect"></select>
         </li>
         <li id="cameraToggle" style="display: none">Turn Camera On</li>
-        <li id="fullscreenBtn" style="float: right; margin-right: 4px">Fullscreen</li>
+        <li id="fullscreenBtn" title="Fullscreen" style="float: right; margin-right: 4px; display:flex; align-items:center; padding:5px 7px"><i class="fa-solid fa-expand"></i></li>
         <li
           id="execute"
-          style="float: right; margin-right: 4px; background-color: green; color: white"
-        >
-          Execute Program
-        </li>
+          title="Execute Program"
+          style="float: right; margin-right: 4px; background-color: green; color: white; display:flex; align-items:center; padding:5px 7px"
+        ><i class="fa-solid fa-play"></i></li>
         <li
           id="stopBtn"
-          style="float: right; margin-right: 4px; background-color: #b00; color: white; display: none"
-        >
-          Stop
-        </li>
+          title="Stop"
+          style="float: right; margin-right: 4px; background-color: #b00; color: white; display: none; padding:5px 7px; align-items:center"
+        ><i class="fa-solid fa-stop"></i></li>
+        <li
+          id="stepBtn"
+          title="Step"
+          style="float: right; margin-right: 4px; background-color: #555; color: white; display: none; padding:5px 7px; align-items:center"
+        ><i class="fa-solid fa-forward-step"></i></li>
+        <li
+          id="stepBackBtn"
+          title="Step Back"
+          style="float: right; margin-right: 4px; background-color: #555; color: white; display: none; padding:5px 7px; align-items:center; opacity:0.4; pointer-events:none"
+        ><i class="fa-solid fa-backward-step"></i></li>
         <li
           id="clearCanvasBtn"
-          style="float: right; margin-right: 4px; display: none"
-        >
-          Clear Canvas
-        </li>
+          title="Clear Canvas"
+          style="float: right; margin-right: 4px; display: none; align-items:center; padding:5px 7px"
+        ><i class="fa-solid fa-eraser"></i></li>
       </ul>
     </nav>
 
@@ -340,6 +400,13 @@
     <script src="mode/javascript/javascript.js"></script>
     <script src="addon/hint/show-hint.js"></script>
     <script src="addon/hint/javascript-hint.js"></script>
+    <script src="addon/edit/closebrackets.js"></script>
+    <script src="addon/edit/matchbrackets.js"></script>
+    <script src="addon/edit/trailingspace.js"></script>
+    <script src="addon/selection/active-line.js"></script>
+    <script src="addon/fold/foldcode.js"></script>
+    <script src="addon/fold/brace-fold.js"></script>
+    <script src="addon/fold/foldgutter.js"></script>
 
     <!-- App JavaScript -->
   </body>
