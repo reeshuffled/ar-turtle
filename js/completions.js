@@ -211,6 +211,9 @@ export const TOOLKIT_CATEGORIES = [
         code: "setTimeout(() => {\n  \n}, 1000);",
         hint: "Run code once after N milliseconds",
       },
+      { label: "pause", code: "pause();", hint: "Pause program execution" },
+      { label: "resume", code: "resume();", hint: "Resume paused program execution" },
+      { label: "stop", code: "stop();", hint: "Stop program execution" },
       { label: "random number", code: "randUni(0, 100)", hint: "Random number between lo and hi" },
       {
         label: "random uniform",

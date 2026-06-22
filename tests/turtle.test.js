@@ -687,6 +687,42 @@ describe('Turtle', () => {
     });
   });
 
+  // ── stepOnce / queueEmpty ────────────────────────────────────────────────────
+
+  describe('stepOnce()', () => {
+    test('returns false when queue is empty', () => {
+      expect(turtle.stepOnce()).toBe(false);
+    });
+
+    test('returns true and executes one item', () => {
+      turtle.pause();
+      turtle.forward(10);
+      const moved = vi.spyOn(turtle.get, 'x');
+      const result = turtle.stepOnce();
+      expect(result).toBe(true);
+    });
+
+    test('drains exactly one item per call', () => {
+      turtle.pause();
+      let count = 0;
+      // Push two items via repeat (synchronous)
+      turtle.repeat(2, () => { turtle.forward(10); });
+      expect(turtle.queueEmpty).toBe(false);
+      turtle.stepOnce();
+      // One item consumed — second still pending
+      expect(turtle.stepOnce()).toBe(true);
+      expect(turtle.stepOnce()).toBe(false);
+    });
+
+    test('queueEmpty false with items, true after all drained', () => {
+      turtle.pause();
+      turtle.forward(10);
+      expect(turtle.queueEmpty).toBe(false);
+      turtle.stepOnce();
+      expect(turtle.queueEmpty).toBe(true);
+    });
+  });
+
   // ── reset / init ─────────────────────────────────────────────────────────────
 
   describe('reset() / init()', () => {

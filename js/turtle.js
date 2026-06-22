@@ -52,6 +52,8 @@ export class Turtle {
     let nextDelay = 0;
     let paused = false;
     let restartQueue;
+    let stepOnceImpl;
+    let isQueueEmpty;
     const q = (() => {
       const funs = [];
       let at = 0;
@@ -83,6 +85,14 @@ export class Turtle {
       restartQueue = () => {
         if (!queueActive && !stopped) run();
       };
+      stepOnceImpl = () => {
+        if (funs.length - at <= 0) return false;
+        funs[at++]();
+        nextDelay = 0;
+        if (at >= funs.length) { funs.length = 0; at = 0; queueActive = false; }
+        return true;
+      };
+      isQueueEmpty = () => funs.length - at <= 0;
       run();
       return (fn) => {
         funs.push(fn);
@@ -374,6 +384,9 @@ export class Turtle {
       paused = false;
       restartQueue();
     };
+
+    Object.defineProperty(this, "queueEmpty", { get: () => isQueueEmpty() });
+    this.stepOnce = () => stepOnceImpl();
 
     // ── Loopers ──────────────────────────────────────────────────────────────
     this.repeat = (amount, fn) => {

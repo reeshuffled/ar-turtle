@@ -236,6 +236,36 @@ Blockly.Blocks["console_log"] = {
   },
 };
 
+Blockly.Blocks["program_pause"] = {
+  init() {
+    this.appendDummyInput().appendField("pause");
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.setColour(CTRL_COLOR);
+    this.setTooltip("Pause program execution");
+  },
+};
+
+Blockly.Blocks["program_resume"] = {
+  init() {
+    this.appendDummyInput().appendField("resume");
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.setColour(CTRL_COLOR);
+    this.setTooltip("Resume paused program execution");
+  },
+};
+
+Blockly.Blocks["program_stop"] = {
+  init() {
+    this.appendDummyInput().appendField("stop");
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.setColour(CTRL_COLOR);
+    this.setTooltip("Stop program execution");
+  },
+};
+
 Blockly.Blocks["timer_set_interval"] = {
   init() {
     this.appendValueInput("DELAY").setCheck("Number").appendField("every");
@@ -696,6 +726,10 @@ javascriptGenerator.forBlock["console_log"] = (block, gen) => {
   const val = gen.valueToCode(block, "VALUE", Order.NONE) || '""';
   return `console.log(${val});\n`;
 };
+
+javascriptGenerator.forBlock["program_pause"] = () => `pause();\n`;
+javascriptGenerator.forBlock["program_resume"] = () => `resume();\n`;
+javascriptGenerator.forBlock["program_stop"] = () => `stop();\n`;
 
 // Event hat blocks use next-connections (blocks chain below). We manually walk
 // the chain in each generator, then override scrub_ to prevent double-generation.
@@ -1221,6 +1255,9 @@ export const TOOLBOX = {
           type: "console_log",
           inputs: { VALUE: { shadow: { type: "text", fields: { TEXT: "hello" } } } },
         },
+        { kind: "block", type: "program_pause" },
+        { kind: "block", type: "program_resume" },
+        { kind: "block", type: "program_stop" },
       ],
     },
     {

@@ -280,7 +280,9 @@ window.onload = () => {
 
   document.addEventListener("fullscreenchange", () => {
     const inFs = !!document.fullscreenElement;
-    document.getElementById("fullscreenBtn").textContent = inFs ? "Exit Fullscreen" : "Fullscreen";
+    const fsBtn = document.getElementById("fullscreenBtn");
+    fsBtn.innerHTML = inFs ? ICONS.exitFullscreen : ICONS.fullscreen;
+    fsBtn.title = inFs ? "Exit Fullscreen" : "Fullscreen";
     document.getElementById("fullscreenBtn").classList.toggle("active", inFs);
     // On exit, inline styles restore; update sprite for restored size.
     if (!inFs) updateSprite();
@@ -332,9 +334,20 @@ window.onload = () => {
   // States: idle → running ↔ paused → stopped → idle
   const executeBtn = document.getElementById("execute");
   const stopBtn = document.getElementById("stopBtn");
+  const stepBtn = document.getElementById("stepBtn");
   const clearCanvasBtn = document.getElementById("clearCanvasBtn");
   let btnState = "idle";
   let idleWatcher = null;
+
+  const ICONS = {
+    play: `<svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" style="display:block"><polygon points="3,1 13,8 3,15"/></svg>`,
+    pause: `<svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" style="display:block"><rect x="2" y="1" width="4" height="14" rx="1"/><rect x="10" y="1" width="4" height="14" rx="1"/></svg>`,
+    stop: `<svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" style="display:block"><rect x="2" y="2" width="12" height="12" rx="2"/></svg>`,
+    reset: `<svg viewBox="0 0 16 16" width="22" height="22" style="display:block"><defs><marker id="reset-arr" markerWidth="4" markerHeight="3" refX="4" refY="1.5" orient="auto" markerUnits="strokeWidth"><polygon points="0,0 4,1.5 0,3" fill="currentColor"/></marker></defs><path d="M14 8A6 6 0 1 1 11 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" marker-end="url(#reset-arr)"/></svg>`,
+    erase: `<svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M1 13L5 4h7l-4 9H1z"/><line x1="4" y1="10" x2="9" y2="10"/><line x1="1" y1="13" x2="15" y2="13"/></svg>`,
+    fullscreen: `<svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><polyline points="1,5 1,1 5,1"/><polyline points="11,1 15,1 15,5"/><polyline points="15,11 15,15 11,15"/><polyline points="5,15 1,15 1,11"/></svg>`,
+    exitFullscreen: `<svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block"><polyline points="5,1 5,5 1,5"/><polyline points="11,1 11,5 15,5"/><polyline points="11,15 11,11 15,11"/><polyline points="5,15 5,11 1,11"/></svg>`,
+  };
 
   // Patch window.setInterval/clearInterval so we can track active user intervals.
   // Uses _nativeSetInterval so our own idleWatcher is invisible to the tracker.
@@ -393,26 +406,32 @@ window.onload = () => {
 
   const setIdle = () => {
     btnState = "idle";
-    executeBtn.textContent = "Execute Program";
+    executeBtn.innerHTML = ICONS.play;
+    executeBtn.title = "Execute Program";
     executeBtn.style.backgroundColor = "green";
     stopBtn.style.display = "none";
+    stepBtn.style.display = "none";
     clearCanvasBtn.style.display = "none";
   };
 
   const setRunning = () => {
     btnState = "running";
-    executeBtn.textContent = "Pause";
+    executeBtn.innerHTML = ICONS.pause;
+    executeBtn.title = "Pause";
     executeBtn.style.backgroundColor = "#c07000";
-    stopBtn.style.display = "";
-    clearCanvasBtn.style.display = "";
+    stopBtn.style.display = "flex";
+    stepBtn.style.display = "none";
+    clearCanvasBtn.style.display = "flex";
   };
 
   const setPaused = () => {
     btnState = "paused";
-    executeBtn.textContent = "Resume";
+    executeBtn.innerHTML = ICONS.play;
+    executeBtn.title = "Resume";
     executeBtn.style.backgroundColor = "green";
-    stopBtn.style.display = "";
-    clearCanvasBtn.style.display = "";
+    stopBtn.style.display = "flex";
+    stepBtn.style.display = "flex";
+    clearCanvasBtn.style.display = "flex";
   };
 
   const setStopped = () => {
@@ -421,9 +440,11 @@ window.onload = () => {
       idleWatcher = null;
     }
     btnState = "stopped";
-    executeBtn.textContent = "Reset";
+    executeBtn.innerHTML = ICONS.reset;
+    executeBtn.title = "Reset";
     executeBtn.style.backgroundColor = "#b00";
     stopBtn.style.display = "none";
+    stepBtn.style.display = "none";
     clearCanvasBtn.style.display = "none";
   };
 
@@ -437,6 +458,7 @@ window.onload = () => {
     idleWatcher = null;
     setStopped();
   };
+  window.stop = stopRunning;
   window.stopRunning = stopRunning;
 
   const startIdleWatcher = () => {
@@ -473,6 +495,7 @@ window.onload = () => {
     window.__ar_timeouts?.clear();
     setPaused();
   };
+  window.pause = pauseRunning;
 
   const resumeRunning = () => {
     window.__ar_turtles?.forEach((t) => t.resume());
@@ -491,6 +514,33 @@ window.onload = () => {
     setRunning();
     startIdleWatcher();
   };
+  window.resume = resumeRunning;
+
+  const stepProgram = () => {
+    if (btnState !== "paused") return;
+    const turtles = window.__ar_turtles ?? [];
+
+    // Drain one item from the first turtle that has queue items.
+    let stepped = false;
+    for (const t of turtles) {
+      if (t.stepOnce()) { stepped = true; break; }
+    }
+
+    if (!stepped) {
+      // Queues empty. If forever loops are active (paused, polling every 50ms),
+      // briefly unpause so one iteration fires and refills the queue, then re-pause.
+      const hasForever = turtles.some(t => !t.isIdle && t.queueEmpty);
+      if (hasForever) {
+        resumeRunning();
+        _nativeSetTimeout(() => { if (btnState === "running") pauseRunning(); }, 60);
+      } else {
+        const intervals = window.__ar_intervals ?? new Map();
+        const listeners = window.__ar_listeners ?? [];
+        if (intervals.size === 0 && listeners.length === 0) setStopped();
+      }
+    }
+  };
+  window.step = stepProgram;
 
   const contextualError = (raw) => {
     const msg = friendlyError(raw);
@@ -720,6 +770,8 @@ window.onload = () => {
   stopBtn.addEventListener("click", () => {
     if (btnState === "running" || btnState === "paused") stopRunning();
   });
+
+  stepBtn.addEventListener("click", stepProgram);
 
   // Seed lastSyncedCode so switchToBlocks on refresh doesn't re-convert text → blocks.
   lastSyncedCode = editor.getValue();
