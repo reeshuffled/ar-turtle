@@ -7,6 +7,9 @@ import { textToBlocks } from "./text-to-blocks.js";
 import { vision, stopVision, preloadVision } from "./vision.js";
 import { TOOLKIT_CATEGORIES, getTurtleVarNames, turtleHint } from "./completions.js";
 import { initCamera } from "./camera.js";
+import { UndoStack } from "./undo-stack.js";
+import { freezeTimers, restoreTimers } from "./timer-manager.js";
+import { computeStepAction } from "./step-controller.js";
 
 // Capture native timer/event functions before any user-code patching.
 const _nativeSetInterval = window.setInterval.bind(window);
@@ -335,9 +338,11 @@ window.onload = () => {
   const executeBtn = document.getElementById("execute");
   const stopBtn = document.getElementById("stopBtn");
   const stepBtn = document.getElementById("stepBtn");
+  const stepBackBtn = document.getElementById("stepBackBtn");
   const clearCanvasBtn = document.getElementById("clearCanvasBtn");
   let btnState = "idle";
   let idleWatcher = null;
+  const undoStack = new UndoStack(20 * 1024 * 1024); // 20 MB
 
   const ICONS = {
     play: `<svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" style="display:block"><polygon points="3,1 13,8 3,15"/></svg>`,
@@ -404,6 +409,11 @@ window.onload = () => {
     window.__ar_listeners = [];
   };
 
+  const syncStepBackBtn = () => {
+    stepBackBtn.style.opacity = undoStack.length > 0 ? "1" : "0.4";
+    stepBackBtn.style.pointerEvents = undoStack.length > 0 ? "" : "none";
+  };
+
   const setIdle = () => {
     btnState = "idle";
     executeBtn.innerHTML = ICONS.play;
@@ -411,6 +421,7 @@ window.onload = () => {
     executeBtn.style.backgroundColor = "green";
     stopBtn.style.display = "none";
     stepBtn.style.display = "none";
+    stepBackBtn.style.display = "none";
     clearCanvasBtn.style.display = "none";
   };
 
@@ -421,6 +432,7 @@ window.onload = () => {
     executeBtn.style.backgroundColor = "#c07000";
     stopBtn.style.display = "flex";
     stepBtn.style.display = "none";
+    stepBackBtn.style.display = "none";
     clearCanvasBtn.style.display = "flex";
   };
 
@@ -431,6 +443,8 @@ window.onload = () => {
     executeBtn.style.backgroundColor = "green";
     stopBtn.style.display = "flex";
     stepBtn.style.display = "flex";
+    stepBackBtn.style.display = "flex";
+    syncStepBackBtn();
     clearCanvasBtn.style.display = "flex";
   };
 
@@ -445,12 +459,12 @@ window.onload = () => {
     executeBtn.style.backgroundColor = "#b00";
     stopBtn.style.display = "none";
     stepBtn.style.display = "none";
+    stepBackBtn.style.display = "none";
     clearCanvasBtn.style.display = "none";
   };
 
   const stopRunning = () => {
-    window.__ar_pausedIntervals = null;
-    window.__ar_pausedTimeouts = null;
+    window.__ar_pausedState = null;
     unpatchTimers();
     unpatchListeners();
     stopVision();
@@ -487,30 +501,20 @@ window.onload = () => {
       idleWatcher = null;
     }
     window.__ar_turtles?.forEach((t) => t.pause());
-    window.__ar_pausedIntervals = new Map(window.__ar_intervals);
-    for (const id of (window.__ar_intervals ?? new Map()).keys()) _nativeClearInterval(id);
-    window.__ar_intervals?.clear();
-    window.__ar_pausedTimeouts = new Map(window.__ar_timeouts);
-    for (const id of (window.__ar_timeouts ?? new Map()).keys()) _nativeClearTimeout(id);
-    window.__ar_timeouts?.clear();
+    window.__ar_pausedState = freezeTimers(
+      window.__ar_intervals ?? new Map(),
+      window.__ar_timeouts ?? new Map(),
+      _nativeClearInterval,
+      _nativeClearTimeout
+    );
     setPaused();
   };
   window.pause = pauseRunning;
 
   const resumeRunning = () => {
     window.__ar_turtles?.forEach((t) => t.resume());
-    for (const { cb, delay, args } of (window.__ar_pausedIntervals ?? new Map()).values()) {
-      window.setInterval(cb, delay, ...args);
-    }
-    window.__ar_pausedIntervals = null;
-    const now = Date.now();
-    for (const { cb, delay, createdAt, args } of (
-      window.__ar_pausedTimeouts ?? new Map()
-    ).values()) {
-      const remaining = Math.max(0, delay - (now - createdAt));
-      window.setTimeout(cb, remaining, ...args);
-    }
-    window.__ar_pausedTimeouts = null;
+    restoreTimers(window.__ar_pausedState, window.setInterval, window.setTimeout);
+    window.__ar_pausedState = null;
     setRunning();
     startIdleWatcher();
   };
@@ -518,29 +522,29 @@ window.onload = () => {
 
   const stepProgram = () => {
     if (btnState !== "paused") return;
-    const turtles = window.__ar_turtles ?? [];
-
-    // Drain one item from the first turtle that has queue items.
-    let stepped = false;
-    for (const t of turtles) {
-      if (t.stepOnce()) { stepped = true; break; }
+    const result = computeStepAction(window.__ar_turtles ?? []);
+    if (result.kind === 'stepped') {
+      undoStack.push(result.anti);
+    } else if (result.kind === 'await-forever') {
+      // Forever loop active but queue drained — briefly unpause so one iteration
+      // fires and refills the queue, then re-pause (> 50 ms poll interval).
+      resumeRunning();
+      _nativeSetTimeout(() => { if (btnState === "running") pauseRunning(); }, 60);
+    } else {
+      const intervals = window.__ar_intervals ?? new Map();
+      const listeners = window.__ar_listeners ?? [];
+      if (intervals.size === 0 && listeners.length === 0) setStopped();
     }
-
-    if (!stepped) {
-      // Queues empty. If forever loops are active (paused, polling every 50ms),
-      // briefly unpause so one iteration fires and refills the queue, then re-pause.
-      const hasForever = turtles.some(t => !t.isIdle && t.queueEmpty);
-      if (hasForever) {
-        resumeRunning();
-        _nativeSetTimeout(() => { if (btnState === "running") pauseRunning(); }, 60);
-      } else {
-        const intervals = window.__ar_intervals ?? new Map();
-        const listeners = window.__ar_listeners ?? [];
-        if (intervals.size === 0 && listeners.length === 0) setStopped();
-      }
-    }
+    syncStepBackBtn();
   };
   window.step = stepProgram;
+
+  const stepBack = () => {
+    if (btnState !== "paused" || undoStack.length === 0) return;
+    undoStack.pop()();
+    syncStepBackBtn();
+  };
+  window.stepBack = stepBack;
 
   const contextualError = (raw) => {
     const msg = friendlyError(raw);
@@ -562,8 +566,8 @@ window.onload = () => {
   };
 
   const reset = () => {
-    window.__ar_pausedIntervals = null;
-    window.__ar_pausedTimeouts = null;
+    undoStack.clear();
+    window.__ar_pausedState = null;
     unpatchTimers();
     unpatchListeners();
     stopVision();
@@ -772,6 +776,7 @@ window.onload = () => {
   });
 
   stepBtn.addEventListener("click", stepProgram);
+  stepBackBtn.addEventListener("click", stepBack);
 
   // Seed lastSyncedCode so switchToBlocks on refresh doesn't re-convert text → blocks.
   lastSyncedCode = editor.getValue();

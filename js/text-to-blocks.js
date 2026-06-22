@@ -152,9 +152,9 @@ function makeMethodBlock(method, args, varName, turtleVar, workspace) {
     case "backward":
       return makeNumBlock("turtle_backward", "AMOUNT", numVal(args[0]), turtleVar, workspace);
     case "right":
-      return makeNumBlock("turtle_right", "DEGREES", numVal(args[0]) ?? 90, turtleVar, workspace);
+      return makeNumBlock("turtle_right", "DEGREES", args[0] !== undefined ? numVal(args[0]) : 90, turtleVar, workspace);
     case "left":
-      return makeNumBlock("turtle_left", "DEGREES", numVal(args[0]) ?? 90, turtleVar, workspace);
+      return makeNumBlock("turtle_left", "DEGREES", args[0] !== undefined ? numVal(args[0]) : 90, turtleVar, workspace);
     case "disc":
       return makeNumBlock("turtle_disc", "RADIUS", numVal(args[0]), turtleVar, workspace);
     case "circle":

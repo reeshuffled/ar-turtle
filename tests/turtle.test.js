@@ -7,14 +7,16 @@ function createCanvas(width = 600, height = 600) {
     strokeStyle: '#000',
     fillStyle: '#000',
     lineWidth: 1,
-    beginPath: vi.fn(),
-    moveTo:    vi.fn(),
-    lineTo:    vi.fn(),
-    stroke:    vi.fn(),
-    fill:      vi.fn(),
-    clearRect: vi.fn(),
-    fillRect:  vi.fn(),
-    arc:       vi.fn(),
+    beginPath:    vi.fn(),
+    moveTo:       vi.fn(),
+    lineTo:       vi.fn(),
+    stroke:       vi.fn(),
+    fill:         vi.fn(),
+    clearRect:    vi.fn(),
+    fillRect:     vi.fn(),
+    arc:          vi.fn(),
+    getImageData: vi.fn(() => ({ data: new Uint8ClampedArray(4) })),
+    putImageData: vi.fn(),
   };
   return { width, height, getContext: () => ctx, _ctx: ctx };
 }
@@ -694,23 +696,19 @@ describe('Turtle', () => {
       expect(turtle.stepOnce()).toBe(false);
     });
 
-    test('returns true and executes one item', () => {
+    test('returns an anti function when item is executed', () => {
       turtle.pause();
       turtle.forward(10);
-      const moved = vi.spyOn(turtle.get, 'x');
       const result = turtle.stepOnce();
-      expect(result).toBe(true);
+      expect(typeof result).toBe('function');
     });
 
     test('drains exactly one item per call', () => {
       turtle.pause();
-      let count = 0;
-      // Push two items via repeat (synchronous)
       turtle.repeat(2, () => { turtle.forward(10); });
       expect(turtle.queueEmpty).toBe(false);
-      turtle.stepOnce();
-      // One item consumed — second still pending
-      expect(turtle.stepOnce()).toBe(true);
+      expect(turtle.stepOnce()).not.toBe(false);
+      expect(turtle.stepOnce()).not.toBe(false);
       expect(turtle.stepOnce()).toBe(false);
     });
 
@@ -720,6 +718,26 @@ describe('Turtle', () => {
       expect(turtle.queueEmpty).toBe(false);
       turtle.stepOnce();
       expect(turtle.queueEmpty).toBe(true);
+    });
+
+    test('anti restores turtle position', () => {
+      turtle.pause();
+      const yBefore = turtle.get.y();
+      turtle.forward(50); // heading=0 → moves in y
+      const anti = turtle.stepOnce();
+      expect(turtle.get.y()).not.toBeCloseTo(yBefore, 0);
+      anti();
+      expect(turtle.get.y()).toBeCloseTo(yBefore, 1);
+    });
+
+    test('anti is a no-op for state-only steps (pen up)', () => {
+      turtle.pause();
+      turtle.pu();
+      const anti = turtle.stepOnce();
+      expect(typeof anti).toBe('function');
+      expect(turtle.get.pu()).toBe(true);
+      anti();
+      expect(turtle.get.pu()).toBe(false);
     });
   });
 
@@ -746,6 +764,264 @@ describe('Turtle', () => {
 
     test('reset() returns turtle (chainable)', () => {
       expect(turtle.reset()).toBe(turtle);
+    });
+  });
+
+  // ── seek / goTo ───────────────────────────────────────────────────────────────
+
+  describe('seek() / goTo()', () => {
+    test('goTo() teleports turtle to object cx/cy', () => {
+      turtle.goTo({ cx: 100, cy: 0 });
+      expect(turtle.get.x()).toBeCloseTo(100);
+      expect(turtle.get.y()).toBeCloseTo(0);
+    });
+
+    test('goTo() with cy moves on y axis', () => {
+      turtle.goTo({ cx: 0, cy: 50 });
+      expect(turtle.get.x()).toBeCloseTo(0);
+      expect(turtle.get.y()).toBeCloseTo(50);
+    });
+
+    test('goTo() is chainable', () => {
+      expect(turtle.goTo({ cx: 0, cy: 0 })).toBe(turtle);
+    });
+
+    test('goTo(null) is a no-op', () => {
+      const xBefore = turtle.get.x();
+      const yBefore = turtle.get.y();
+      turtle.goTo(null);
+      expect(turtle.get.x()).toBe(xBefore);
+      expect(turtle.get.y()).toBe(yBefore);
+    });
+
+    test('seek() moves turtle toward object by default step (10)', () => {
+      turtle.seek({ cx: 100, cy: 0 });
+      expect(turtle.get.x()).toBeCloseTo(10, 0);
+      expect(turtle.get.y()).toBeCloseTo(0, 0);
+    });
+
+    test('seek() accepts a custom step', () => {
+      turtle.seek({ cx: 100, cy: 0 }, 25);
+      expect(turtle.get.x()).toBeCloseTo(25, 0);
+    });
+
+    test('seek() is chainable', () => {
+      expect(turtle.seek({ cx: 0, cy: 0 })).toBe(turtle);
+    });
+
+    test('seek(null) is a no-op', () => {
+      const xBefore = turtle.get.x();
+      turtle.seek(null);
+      expect(turtle.get.x()).toBe(xBefore);
+    });
+
+    test('seek() draws a line when pen is down', () => {
+      turtle.seek({ cx: 100, cy: 0 });
+      flushQueue();
+      expect(canvas._ctx.stroke).toHaveBeenCalled();
+    });
+
+    test('goTo() draws a line when pen is down', () => {
+      turtle.goTo({ cx: 50, cy: 50 });
+      flushQueue();
+      expect(canvas._ctx.stroke).toHaveBeenCalled();
+    });
+  });
+
+  // ── pause / resume ────────────────────────────────────────────────────────────
+
+  describe('pause() / resume()', () => {
+    test('pause() prevents queued commands from executing', () => {
+      turtle.pause();
+      turtle.forward(100);
+      vi.advanceTimersByTime(2000);
+      expect(canvas._ctx.stroke).not.toHaveBeenCalled();
+    });
+
+    test('resume() after pause() allows queued commands to execute', () => {
+      turtle.pause();
+      turtle.forward(100);
+      expect(canvas._ctx.stroke).not.toHaveBeenCalled();
+      turtle.resume();
+      vi.advanceTimersByTime(500);
+      expect(canvas._ctx.stroke).toHaveBeenCalled();
+    });
+
+    test('resume() processes multiple queued commands', () => {
+      turtle.pause();
+      turtle.forward(10).forward(10).forward(10);
+      turtle.resume();
+      vi.advanceTimersByTime(500);
+      expect(canvas._ctx.stroke).toHaveBeenCalledTimes(3);
+    });
+
+    test('position updated synchronously even while paused', () => {
+      turtle.pause();
+      turtle.forward(50);
+      expect(turtle.get.y()).toBeCloseTo(50);
+      expect(canvas._ctx.stroke).not.toHaveBeenCalled();
+    });
+
+    test('turtle works normally after pause/resume cycle', () => {
+      turtle.pause();
+      turtle.resume();
+      turtle.forward(10);
+      flushQueue();
+      expect(canvas._ctx.stroke).toHaveBeenCalled();
+    });
+  });
+
+  // ── arc() ─────────────────────────────────────────────────────────────────────
+
+  describe('arc()', () => {
+    test('arc() calls ctx.arc', () => {
+      turtle.arc(50, 90);
+      flushQueue();
+      expect(canvas._ctx.arc).toHaveBeenCalled();
+    });
+
+    test('arc() calls ctx.stroke when pen is down', () => {
+      turtle.arc(50, 90);
+      flushQueue();
+      expect(canvas._ctx.stroke).toHaveBeenCalled();
+    });
+
+    test('arc() does not call ctx.stroke when pen is up', () => {
+      turtle.pu().arc(50, 90);
+      flushQueue();
+      expect(canvas._ctx.stroke).not.toHaveBeenCalled();
+    });
+
+    test('arc() changes turtle position', () => {
+      const xBefore = turtle.get.x();
+      const yBefore = turtle.get.y();
+      turtle.arc(50, 90);
+      expect(
+        Math.abs(turtle.get.x() - xBefore) + Math.abs(turtle.get.y() - yBefore)
+      ).toBeGreaterThan(1);
+    });
+
+    test('arc() changes heading by the specified degrees', () => {
+      turtle.arc(50, 90);
+      expect(turtle.get.heading()).toBeCloseTo(-90, 0);
+    });
+
+    test('arc() is chainable', () => {
+      expect(turtle.arc(50, 90)).toBe(turtle);
+    });
+
+    test('arc() with negative degrees curves in opposite direction', () => {
+      turtle.arc(50, -90);
+      expect(turtle.get.heading()).toBeCloseTo(90, 0);
+    });
+  });
+
+  // ── rand (extended) ───────────────────────────────────────────────────────────
+
+  describe('rand (extended)', () => {
+    test('rand.norm(100, 0) returns exactly 100 when stdDev is 0', () => {
+      expect(turtle.rand.norm(100, 0)).toBe(100);
+    });
+
+    test('rand.chance(0.5) returns a boolean', () => {
+      expect(typeof turtle.rand.chance(0.5)).toBe('boolean');
+    });
+
+    test('rand.uni is deterministic when Math.random is mocked', () => {
+      const spy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+      expect(turtle.rand.uni(10, 20)).toBeCloseTo(15);
+      spy.mockRestore();
+    });
+
+    test('rand.uni(upper) single-arg uses 0 as lower bound', () => {
+      const spy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+      expect(turtle.rand.uni(10)).toBeCloseTo(5);
+      spy.mockRestore();
+    });
+
+    test('rand.chance returns true when Math.random is below odds', () => {
+      const spy = vi.spyOn(Math, 'random').mockReturnValue(0.3);
+      expect(turtle.rand.chance(0.5)).toBe(true);
+      spy.mockRestore();
+    });
+
+    test('rand.chance returns false when Math.random is at or above odds', () => {
+      const spy = vi.spyOn(Math, 'random').mockReturnValue(0.7);
+      expect(turtle.rand.chance(0.5)).toBe(false);
+      spy.mockRestore();
+    });
+  });
+
+  // ── stepOnce with draw operations ─────────────────────────────────────────────
+
+  describe('stepOnce with draw operations', () => {
+    test('stepOnce() executes disc() and calls ctx.arc + fill', () => {
+      turtle.pause();
+      turtle.disc(20);
+      const result = turtle.stepOnce();
+      expect(result).not.toBe(false);
+      expect(canvas._ctx.arc).toHaveBeenCalled();
+      expect(canvas._ctx.fill).toHaveBeenCalled();
+    });
+
+    test('stepOnce() executes circle() and calls ctx.arc + stroke', () => {
+      turtle.pause();
+      turtle.circle(10);
+      const result = turtle.stepOnce();
+      expect(result).not.toBe(false);
+      expect(canvas._ctx.arc).toHaveBeenCalled();
+      expect(canvas._ctx.stroke).toHaveBeenCalled();
+    });
+
+    test('stepOnce() executes clean() and calls ctx.clearRect', () => {
+      turtle.pause();
+      turtle.clean();
+      const result = turtle.stepOnce();
+      expect(result).not.toBe(false);
+      expect(canvas._ctx.clearRect).toHaveBeenCalledWith(0, 0, 600, 600);
+    });
+
+    test('stepOnce() returns false after draw op drains queue', () => {
+      turtle.pause();
+      turtle.disc(20);
+      turtle.stepOnce();
+      expect(turtle.stepOnce()).toBe(false);
+    });
+  });
+
+  // ── z() / getLayer() ──────────────────────────────────────────────────────────
+
+  describe('z() / getLayer()', () => {
+    test('z() switches ctx to new layer canvas', () => {
+      const layer1Canvas = createCanvas(600, 600);
+      window.__ar_getLayerCanvas = (n) => (n === 1 ? layer1Canvas : canvas);
+      window.__ar_layer_objects = new Map();
+      turtle.z(1);
+      turtle.forward(10);
+      flushQueue();
+      expect(layer1Canvas._ctx.stroke).toHaveBeenCalled();
+      expect(canvas._ctx.stroke).not.toHaveBeenCalled();
+    });
+
+    test('z() is chainable', () => {
+      expect(turtle.z(0)).toBe(turtle);
+    });
+
+    test('getLayer() returns a Layer object with Layer API methods', () => {
+      window.__ar_layer_objects = new Map();
+      const layer = turtle.getLayer();
+      expect(layer).toBeDefined();
+      expect(typeof layer.blur).toBe('function');
+    });
+
+    test('getLayer() returns different layer after z() switches to new z', () => {
+      const layer1Canvas = createCanvas(600, 600);
+      window.__ar_getLayerCanvas = (n) => (n === 1 ? layer1Canvas : canvas);
+      window.__ar_layer_objects = new Map();
+      const layerBefore = turtle.getLayer();
+      turtle.z(1);
+      const layerAfter = turtle.getLayer();
+      expect(layerBefore).not.toBe(layerAfter);
     });
   });
 });

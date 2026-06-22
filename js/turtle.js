@@ -47,6 +47,8 @@ export class Turtle {
     // ── Queue ────────────────────────────────────────────────────────────────
     // Processes one action per tick (or batches when the queue is very long).
     // The idle poll (200 ms) keeps the loop alive between bursts.
+    // Each item optionally carries an antiBuilder: a fn called just before the
+    // item executes that snapshots dirty canvas state and returns the anti-action.
     let queueActive = false;
     let activeLoops = 0;
     let nextDelay = 0;
@@ -56,6 +58,7 @@ export class Turtle {
     let isQueueEmpty;
     const q = (() => {
       const funs = [];
+      const antiBuilders = [];
       let at = 0;
       const run = () => {
         if (stopped || paused) return;
@@ -77,6 +80,7 @@ export class Turtle {
           queueActive = false;
           if (funs.length > 0) {
             funs.length = 0;
+            antiBuilders.length = 0;
             at = 0;
           }
           setTimeout(run, 200);
@@ -85,17 +89,22 @@ export class Turtle {
       restartQueue = () => {
         if (!queueActive && !stopped) run();
       };
+      // Returns false if queue empty, otherwise calls antiBuilder (captures
+      // "before" state), executes the item, and returns the anti closure.
       stepOnceImpl = () => {
         if (funs.length - at <= 0) return false;
+        const antiBuilder = antiBuilders[at];
+        const anti = antiBuilder ? antiBuilder() : () => {};
         funs[at++]();
         nextDelay = 0;
-        if (at >= funs.length) { funs.length = 0; at = 0; queueActive = false; }
-        return true;
+        if (at >= funs.length) { funs.length = 0; antiBuilders.length = 0; at = 0; queueActive = false; }
+        return anti;
       };
       isQueueEmpty = () => funs.length - at <= 0;
       run();
-      return (fn) => {
+      return (fn, antiBuilder = null) => {
         funs.push(fn);
+        antiBuilders.push(antiBuilder);
         queueActive = true;
       };
     })();
@@ -128,19 +137,85 @@ export class Turtle {
       return fn;
     })();
 
-    const moveTo = (x, y) => {
-      pos.x = x;
-      pos.y = y;
-      const args = { x, y, pd: penDown, width, fg: foreground };
-      q(() => go(args));
+    // ── Step-back helpers ────────────────────────────────────────────────────
+    // captureState / restoreState handle turtle private state.
+    // lineRect / circleRect compute dirty canvas regions for draw commands.
+    // stateAnti / drawAnti build antiBuilders for each command type.
+    const captureState = () => ({
+      x: pos.x, y: pos.y, heading, fg: foreground, bg: background, width, penDown,
+    });
+
+    const restoreState = (snap) => {
+      pos.x = snap.x; pos.y = snap.y;
+      heading = snap.heading;
+      foreground = snap.fg;
+      background = snap.bg;
+      width = snap.width;
+      penDown = snap.penDown;
+      go({ x: snap.x, y: snap.y, pd: false, width: snap.width, fg: snap.fg });
+      trigger("rotate", -snap.heading * (180 / Math.PI));
+    };
+
+    const lineRect = (x1, y1, x2, y2, w) => {
+      const pad = Math.ceil(w / 2) + 2;
+      const ix = Math.max(0, Math.floor(Math.min(x1, x2) - pad));
+      const iy = Math.max(0, Math.floor(Math.min(y1, y2) - pad));
+      const ir = Math.min(canvasWidth, Math.ceil(Math.max(x1, x2) + pad));
+      const ib = Math.min(canvasHeight, Math.ceil(Math.max(y1, y2) + pad));
+      return { ix, iy, iw: Math.max(0, ir - ix), ih: Math.max(0, ib - iy) };
+    };
+
+    const circleRect = (x, y, r, w = 0) => {
+      const pad = Math.ceil(w / 2) + 2;
+      const ix = Math.max(0, Math.floor(x - r - pad));
+      const iy = Math.max(0, Math.floor(y - r - pad));
+      const ir = Math.min(canvasWidth, Math.ceil(x + r + pad));
+      const ib = Math.min(canvasHeight, Math.ceil(y + r + pad));
+      return { ix, iy, iw: Math.max(0, ir - ix), ih: Math.max(0, ib - iy) };
+    };
+
+    // antiBuilder for state-only changes (no canvas pixels modified).
+    const stateAnti = (snap) => () => {
+      const anti = () => restoreState(snap);
+      anti.bytes = 100;
+      return anti;
+    };
+
+    // antiBuilder for draw commands: snapshots the dirty rect just before the
+    // draw executes, returns closure that restores pixels + turtle state.
+    // anti.bytes reflects the actual ImageData allocation so callers can budget.
+    const drawAnti = (rect, snap) => () => {
+      const { ix, iy, iw, ih } = rect;
+      const imageData = iw > 0 && ih > 0 ? ctx.getImageData(ix, iy, iw, ih) : null;
+      const anti = () => {
+        if (imageData) { ctx.putImageData(imageData, ix, iy); go.resetCache(); }
+        restoreState(snap);
+      };
+      anti.bytes = iw * ih * 4;
+      return anti;
     };
 
     // ── Movement ─────────────────────────────────────────────────────────────
+    const moveTo = (x, y) => {
+      const snap = captureState();
+      pos.x = x;
+      pos.y = y;
+      const args = { x, y, pd: penDown, width, fg: foreground };
+      const anti = penDown
+        ? drawAnti(lineRect(snap.x, snap.y, x, y, Number(width)), snap)
+        : stateAnti(snap);
+      q(() => go(args), anti);
+    };
+
     this.forward = (amount) => {
+      const snap = captureState();
       pos.x += Math.sin(heading) * -amount;
       pos.y += Math.cos(heading) * -amount;
       const args = { x: pos.x, y: pos.y, pd: penDown, width, fg: foreground };
-      q(() => go(args));
+      const anti = penDown
+        ? drawAnti(lineRect(snap.x, snap.y, pos.x, pos.y, Number(width)), snap)
+        : stateAnti(snap);
+      q(() => go(args), anti);
       return this;
     };
     this.backward = (amount) => this.forward(-amount);
@@ -159,25 +234,28 @@ export class Turtle {
     };
 
     this.heading = (deg) => {
+      const snap = captureState();
       heading = -deg * (Math.PI / 180);
       const absDeg = this.get.heading();
-      q(() => trigger("rotate", absDeg));
+      q(() => trigger("rotate", absDeg), stateAnti(snap));
       return this;
     };
 
     this.face = (x, y) => {
+      const snap = captureState();
       const absX = origin.x + x;
       const absY = origin.y - y;
       heading = Math.atan2(pos.x - absX, pos.y - absY);
-      q(() => trigger("rotate", heading * (180 / Math.PI)));
+      q(() => trigger("rotate", heading * (180 / Math.PI)), stateAnti(snap));
       return this;
     };
 
     this.butt = (x, y) => {
+      const snap = captureState();
       const absX = origin.x + x;
       const absY = origin.y - y;
       heading = Math.atan2(pos.x - absX, pos.y - absY) + Math.PI;
-      q(() => trigger("rotate", heading * (180 / Math.PI)));
+      q(() => trigger("rotate", heading * (180 / Math.PI)), stateAnti(snap));
       return this;
     };
 
@@ -197,27 +275,32 @@ export class Turtle {
     // ── Shapes ───────────────────────────────────────────────────────────────
     this.disc = (radius) => {
       const { x, y } = pos;
+      const snap = captureState();
+      const rect = circleRect(x, y, radius);
       q(() => {
         ctx.beginPath();
         ctx.fillStyle = foreground;
         ctx.arc(x, y, radius, 0, 2 * Math.PI, true);
         ctx.fill();
-      });
+      }, drawAnti(rect, snap));
       return this;
     };
 
     this.circle = (radius) => {
       const { x, y } = pos;
+      const snap = captureState();
+      const rect = circleRect(x, y, radius, Number(width));
       q(() => {
         ctx.beginPath();
         ctx.strokeStyle = foreground;
         ctx.arc(x, y, radius, 0, 2 * Math.PI, true);
         ctx.stroke();
-      });
+      }, drawAnti(rect, snap));
       return this;
     };
 
     this.arc = (radius, degrees) => {
+      const snap = captureState();
       const d = degrees * (Math.PI / 180);
       let cx, cy, startA, endA, ccw;
       if (degrees >= 0) {
@@ -249,6 +332,10 @@ export class Turtle {
         width,
         fg: foreground,
       };
+      // Conservative bounding box: full circle around arc center.
+      const anti = arcArgs.pd
+        ? drawAnti(circleRect(cx, cy, radius, Number(width)), snap)
+        : stateAnti(snap);
       q(() => {
         if (arcArgs.pd) {
           ctx.beginPath();
@@ -258,28 +345,31 @@ export class Turtle {
           ctx.stroke();
         }
         go({ x: arcArgs.x, y: arcArgs.y, pd: false, width: arcArgs.width, fg: arcArgs.fg });
-      });
+      }, anti);
       return this;
     };
 
     // ── Rotation ─────────────────────────────────────────────────────────────
-    this.right = (deg) => {
+    this.right = (deg = 90) => {
+      const snap = captureState();
       heading -= deg * (Math.PI / 180);
       const absDeg = this.get.heading();
-      q(() => trigger("rotate", absDeg));
+      q(() => trigger("rotate", absDeg), stateAnti(snap));
       return this;
     };
     this.left = (deg) => this.right(-deg);
 
     // ── Pen ──────────────────────────────────────────────────────────────────
     this.pu = () => {
+      const snap = captureState();
       penDown = false;
-      q(() => trigger("pu"));
+      q(() => trigger("pu"), stateAnti(snap));
       return this;
     };
     this.pd = () => {
+      const snap = captureState();
       penDown = true;
-      q(() => trigger("pd"));
+      q(() => trigger("pd"), stateAnti(snap));
       return this;
     };
 
@@ -294,17 +384,19 @@ export class Turtle {
     };
 
     this.clean = (color) => {
+      const snap = captureState();
       if (color) background = color;
       const bg = background;
       q(() => {
         ctx.fillStyle = bg;
         ctx.clearRect(0, 0, canvasWidth, canvasHeight);
         ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-      });
+      }, drawAnti({ ix: 0, iy: 0, iw: canvasWidth, ih: canvasHeight }, snap));
       return this;
     };
 
     this.home = () => {
+      const snap = captureState();
       heading = 0;
       pos.x = origin.x;
       pos.y = origin.y;
@@ -312,7 +404,7 @@ export class Turtle {
       q(() => {
         go(args);
         trigger("rotate", 0);
-      });
+      }, stateAnti(snap));
       return this;
     };
 
@@ -386,6 +478,8 @@ export class Turtle {
     };
 
     Object.defineProperty(this, "queueEmpty", { get: () => isQueueEmpty() });
+    // Returns false if nothing to step; otherwise executes one item and returns
+    // the anti closure (call it to undo that step).
     this.stepOnce = () => stepOnceImpl();
 
     // ── Loopers ──────────────────────────────────────────────────────────────
